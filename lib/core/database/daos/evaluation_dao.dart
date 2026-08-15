@@ -4,7 +4,7 @@ import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
 
 part 'evaluation_dao.g.dart';
 
-@DriftAccessor(tables: [Assessments, Evaluations, EvaluationEntries, ObservationNotes, Students, RubricCriteria])
+@DriftAccessor(tables: [Assessments, Evaluations, EvaluationEntries, ObservationNotes, Students, RubricCriteria, RubricLevels])
 class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMixin {
   EvaluationDao(super.db);
 
@@ -20,13 +20,11 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
       ..orderBy([OrderingTerm.asc(students.schoolNumber), OrderingTerm.asc(students.fullName)]);
     return query.watch().map(
           (rows) => rows
-              .map(
-                (row) => EvaluationStudentRow(
-                  evaluation: row.readTable(evaluations),
-                  student: row.readTable(students),
-                  scoredCriteria: row.read(scoredCount) ?? 0,
-                ),
-              )
+              .map((row) => EvaluationStudentRow(
+                    evaluation: row.readTable(evaluations),
+                    student: row.readTable(students),
+                    scoredCriteria: row.read(scoredCount) ?? 0,
+                  ))
               .toList(),
         );
   }
@@ -42,6 +40,13 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
     final assessment = await (select(assessments)..where((row) => row.id.equals(assessmentId))).getSingle();
     return (select(rubricCriteria)
           ..where((row) => row.rubricId.equals(assessment.rubricId))
+          ..orderBy([(row) => OrderingTerm.asc(row.sortOrder)]))
+        .get();
+  }
+
+  Future<List<RubricLevel>> levelsForCriterion(int criterionId) {
+    return (select(rubricLevels)
+          ..where((row) => row.criterionId.equals(criterionId))
           ..orderBy([(row) => OrderingTerm.asc(row.sortOrder)]))
         .get();
   }
@@ -72,9 +77,7 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
   }
 
   Future<int> addObservation(int evaluationId, String text) {
-    return into(observationNotes).insert(
-      ObservationNotesCompanion.insert(evaluationId: evaluationId, text: text.trim()),
-    );
+    return into(observationNotes).insert(ObservationNotesCompanion.insert(evaluationId: evaluationId, text: text.trim()));
   }
 
   Stream<List<ObservationNote>> watchObservations(int evaluationId) {
@@ -86,9 +89,9 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
 
   Future<void> _refreshEvaluationStatus(int evaluationId) async {
     final evaluation = await (select(evaluations)..where((row) => row.id.equals(evaluationId))).getSingle();
+    final assessment = await (select(assessments)..where((row) => row.id.equals(evaluation.assessmentId))).getSingle();
     final criteriaCountExpression = rubricCriteria.id.count();
     final scoredCountExpression = evaluationEntries.id.count();
-    final assessment = await (select(assessments)..where((row) => row.id.equals(evaluation.assessmentId))).getSingle();
     final criteriaCount = await (selectOnly(rubricCriteria)
           ..addColumns([criteriaCountExpression])
           ..where(rubricCriteria.rubricId.equals(assessment.rubricId)))
