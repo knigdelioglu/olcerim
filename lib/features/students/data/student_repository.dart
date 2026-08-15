@@ -8,11 +8,23 @@ class StudentRepository {
   Stream<List<Student>> watchStudents(int classroomId, {bool archived = false}) =>
       _database.studentDao.watchStudents(classroomId, archived: archived);
 
+  Stream<List<Student>> watchArchivedStudents() => _database.studentDao.watchArchivedStudents();
+
   Future<List<Student>> studentsForClassroom(int classroomId) =>
       _database.studentDao.studentsForClassroom(classroomId);
 
-  Future<int> saveStudent({int? id, required int classroomId, String? schoolNumber, required String fullName}) =>
-      _database.studentDao.saveStudent(id: id, classroomId: classroomId, schoolNumber: schoolNumber, fullName: fullName);
+  Future<int> saveStudent({
+    int? id,
+    required int classroomId,
+    String? schoolNumber,
+    required String fullName,
+  }) =>
+      _database.studentDao.saveStudent(
+        id: id,
+        classroomId: classroomId,
+        schoolNumber: schoolNumber,
+        fullName: fullName,
+      );
 
   Future<void> importStudents(int classroomId, List<StudentImportRecord> records) =>
       _database.studentDao.insertMultipleStudents(classroomId, records);

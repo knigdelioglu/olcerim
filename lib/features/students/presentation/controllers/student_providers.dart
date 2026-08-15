@@ -10,3 +10,7 @@ final studentRepositoryProvider = Provider<StudentRepository>(
 final studentsProvider = StreamProvider.family<List<Student>, int>((ref, classroomId) {
   return ref.watch(studentRepositoryProvider).watchStudents(classroomId);
 });
+
+final archivedStudentsProvider = StreamProvider<List<Student>>((ref) {
+  return ref.watch(studentRepositoryProvider).watchArchivedStudents();
+});

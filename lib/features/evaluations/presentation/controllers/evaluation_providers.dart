@@ -7,12 +7,43 @@ import 'package:olcerim/features/evaluations/data/assessment_repository.dart';
 import 'package:olcerim/features/evaluations/data/evaluation_repository.dart';
 import 'package:olcerim/features/evaluations/domain/assessment_results.dart';
 
-final assessmentRepositoryProvider = Provider<AssessmentRepository>((ref) => AssessmentRepository(ref.watch(databaseProvider)));
-final evaluationRepositoryProvider = Provider<EvaluationRepository>((ref) => EvaluationRepository(ref.watch(databaseProvider)));
-final assessmentsProvider = StreamProvider<List<AssessmentSummaryRow>>((ref) => ref.watch(assessmentRepositoryProvider).watchAssessments());
-final assessmentDetailProvider = FutureProvider.family<AssessmentDetailRow?, int>((ref, id) => ref.watch(assessmentRepositoryProvider).detail(id));
-final assessmentStudentsProvider = StreamProvider.family<List<EvaluationStudentRow>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).watchStudents(id));
-final assessmentCriteriaProvider = FutureProvider.family<List<RubricCriterion>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).criteria(id));
-final evaluationEntriesProvider = StreamProvider.family<List<EvaluationEntry>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).watchEntries(id));
-final criterionLevelsProvider = FutureProvider.family<List<RubricLevel>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).levels(id));
-final assessmentResultsProvider = FutureProvider.family<AssessmentResults, int>((ref, id) => ref.watch(evaluationRepositoryProvider).loadResults(id));
+final assessmentRepositoryProvider = Provider<AssessmentRepository>(
+  (ref) => AssessmentRepository(ref.watch(databaseProvider)),
+);
+final evaluationRepositoryProvider = Provider<EvaluationRepository>(
+  (ref) => EvaluationRepository(ref.watch(databaseProvider)),
+);
+
+final assessmentsProvider = StreamProvider<List<AssessmentSummaryRow>>(
+  (ref) => ref.watch(assessmentRepositoryProvider).watchAssessments(),
+);
+
+final assessmentsByStatusProvider = StreamProvider.family<List<AssessmentSummaryRow>, String?>(
+  (ref, status) => ref.watch(assessmentRepositoryProvider).watchAssessments(status: status),
+);
+
+final archivedAssessmentsProvider = StreamProvider<List<AssessmentSummaryRow>>(
+  (ref) => ref.watch(assessmentRepositoryProvider).watchAssessments(archived: true),
+);
+
+final assessmentDetailProvider = FutureProvider.family<AssessmentDetailRow?, int>(
+  (ref, id) => ref.watch(assessmentRepositoryProvider).detail(id),
+);
+final assessmentStudentsProvider = StreamProvider.family<List<EvaluationStudentRow>, int>(
+  (ref, id) => ref.watch(evaluationRepositoryProvider).watchStudents(id),
+);
+final assessmentCriteriaProvider = FutureProvider.family<List<RubricCriterion>, int>(
+  (ref, id) => ref.watch(evaluationRepositoryProvider).criteria(id),
+);
+final evaluationEntriesProvider = StreamProvider.family<List<EvaluationEntry>, int>(
+  (ref, id) => ref.watch(evaluationRepositoryProvider).watchEntries(id),
+);
+final criterionLevelsProvider = FutureProvider.family<List<RubricLevel>, int>(
+  (ref, id) => ref.watch(evaluationRepositoryProvider).levels(id),
+);
+final evaluationObservationsProvider = StreamProvider.family<List<ObservationNote>, int>(
+  (ref, id) => ref.watch(evaluationRepositoryProvider).watchObservations(id),
+);
+final assessmentResultsProvider = FutureProvider.family<AssessmentResults, int>(
+  (ref, id) => ref.watch(evaluationRepositoryProvider).loadResults(id),
+);

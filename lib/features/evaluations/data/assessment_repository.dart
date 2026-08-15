@@ -6,8 +6,9 @@ class AssessmentRepository {
   AssessmentRepository(this._database);
   final AppDatabase _database;
 
-  Stream<List<AssessmentSummaryRow>> watchAssessments({String? status}) =>
-      _database.assessmentDao.watchAssessments(status: status);
+  Stream<List<AssessmentSummaryRow>> watchAssessments({String? status, bool archived = false}) =>
+      _database.assessmentDao.watchAssessments(status: status, archived: archived);
+
   Future<AssessmentDetailRow?> detail(int id) => _database.assessmentDao.detail(id);
 
   Future<int> create({
