@@ -1,0 +1,123 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:olcerim/core/database/app_database.dart';
+import 'package:olcerim/core/database/daos/school_dao.dart';
+import 'package:olcerim/core/database/database_provider.dart';
+import 'package:olcerim/features/classrooms/presentation/controllers/classroom_providers.dart';
+import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
+import 'package:olcerim/features/evaluations/presentation/controllers/evaluation_providers.dart';
+
+final availableRubricsProvider = StreamProvider<List<Rubric>>((ref) {
+  return ref.watch(databaseProvider).rubricDao.watchAllRubrics();
+});
+
+class CreateAssessmentView extends ConsumerStatefulWidget {
+  const CreateAssessmentView({super.key});
+  @override
+  ConsumerState<CreateAssessmentView> createState() => _CreateAssessmentViewState();
+}
+
+class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
+  int step = 0;
+  int? classroomId;
+  int? rubricId;
+  AssessmentType type = AssessmentType.rubric;
+  final title = TextEditingController();
+  final description = TextEditingController();
+  DateTime date = DateTime.now();
+  bool saving = false;
+
+  @override
+  void dispose() {
+    title.dispose();
+    description.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final classrooms = ref.watch(classroomsProvider(null)).valueOrNull ?? const <ClassroomSummaryRow>[];
+    final rubrics = ref.watch(availableRubricsProvider).valueOrNull ?? const <Rubric>[];
+    return Scaffold(
+      appBar: AppBar(title: const Text('Yeni değerlendirme')),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Stepper(
+            currentStep: step,
+            onStepContinue: () => step == 3 ? _save() : setState(() => step++),
+            onStepCancel: step == 0 ? null : () => setState(() => step--),
+            controlsBuilder: (context, details) => Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Row(children: [FilledButton(onPressed: saving || !_canContinue ? null : details.onStepContinue, child: Text(step == 3 ? 'Değerlendirmeyi oluştur' : 'Devam')), if (step > 0) ...[const SizedBox(width: 8), TextButton(onPressed: details.onStepCancel, child: const Text('Geri'))]]),
+            ),
+            steps: [
+              Step(title: const Text('Sınıf'), isActive: step >= 0, content: _classroomSelection(classrooms)),
+              Step(title: const Text('Değerlendirme tipi'), isActive: step >= 1, content: _typeSelection()),
+              Step(title: const Text('Rubrik / ölçek'), isActive: step >= 2, content: _rubricSelection(rubrics)),
+              Step(title: const Text('Detay'), isActive: step >= 3, content: _details()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool get _canContinue => switch (step) { 0 => classroomId != null, 1 => true, 2 => rubricId != null, _ => title.text.trim().isNotEmpty };
+
+  Widget _classroomSelection(List<ClassroomSummaryRow> items) => Column(
+        children: items
+            .map((item) => RadioListTile<int>(value: item.classroom.id, groupValue: classroomId, title: Text(item.classroom.name), subtitle: Text(item.course.name), onChanged: (value) => setState(() => classroomId = value)))
+            .toList(),
+      );
+
+  Widget _typeSelection() => SegmentedButton<AssessmentType>(
+        segments: AssessmentType.values.map((item) => ButtonSegment(value: item, label: Text(item.label), icon: Icon(item == AssessmentType.rubric ? Icons.rule : Icons.speed))).toList(),
+        selected: {type},
+        onSelectionChanged: (values) => setState(() => type = values.first),
+      );
+
+  Widget _rubricSelection(List<Rubric> items) {
+    if (items.isEmpty) return const Text('Henüz rubrik yok. Rubrikler bölümünde bir rubrik oluşturduktan sonra değerlendirme oluşturabilirsiniz.');
+    return Column(
+      children: items.map((item) => RadioListTile<int>(value: item.id, groupValue: rubricId, title: Text(item.title), subtitle: item.description == null ? null : Text(item.description!), onChanged: (value) => setState(() => rubricId = value))).toList(),
+    );
+  }
+
+  Widget _details() => Column(
+        children: [
+          TextField(controller: title, onChanged: (_) => setState(() {}), decoration: const InputDecoration(labelText: 'Değerlendirme adı')),
+          const SizedBox(height: 12),
+          TextField(controller: description, decoration: const InputDecoration(labelText: 'Açıklama (opsiyonel)'), minLines: 2, maxLines: 4),
+          const SizedBox(height: 12),
+          ListTile(title: const Text('Tarih'), subtitle: Text('${date.day}.${date.month}.${date.year}'), trailing: const Icon(Icons.calendar_today), onTap: _pickDate),
+        ],
+      );
+
+  Future<void> _pickDate() async {
+    final selected = await showDatePicker(context: context, initialDate: date, firstDate: DateTime(DateTime.now().year - 2), lastDate: DateTime(DateTime.now().year + 3));
+    if (selected != null) setState(() => date = selected);
+  }
+
+  Future<void> _save() async {
+    if (!_canContinue || classroomId == null || rubricId == null) return;
+    setState(() => saving = true);
+    try {
+      final id = await ref.read(assessmentRepositoryProvider).create(
+            classroomId: classroomId!,
+            rubricId: rubricId!,
+            type: type,
+            title: title.text,
+            description: description.text,
+            assessmentDate: date,
+          );
+      if (!mounted) return;
+      Navigator.pop(context, id);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Değerlendirme oluşturulamadı.')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+}
