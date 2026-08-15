@@ -1,6 +1,3 @@
-import 'dart:typed_data';
-
-import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -184,20 +181,13 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['xlsx', 'csv'],
-      withData: true,
     );
-    if (result == null) return;
+    if (file == null) return;
 
-    final file = result.files.single;
-    Uint8List? bytes = file.bytes;
-    if (bytes == null && file.path != null) {
-      bytes = await XFile(file.path!).readAsBytes();
-    }
-    if (bytes == null) return;
-
+    final bytes = await file.readAsBytes();
     setState(() {
       busy = true;
       fileName = file.name;
