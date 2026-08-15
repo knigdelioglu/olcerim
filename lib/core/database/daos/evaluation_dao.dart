@@ -88,15 +88,26 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
       final normalizedNote = note == null
           ? existing?.note
           : (note.trim().isEmpty ? null : note.trim());
-      await into(evaluationEntries).insertOnConflictUpdate(
-        EvaluationEntriesCompanion.insert(
-          evaluationId: evaluationId,
-          criterionId: criterionId,
-          score: score,
-          note: Value(normalizedNote),
-          evaluatedAt: Value(DateTime.now()),
-        ),
-      );
+      final now = DateTime.now();
+      if (existing == null) {
+        await into(evaluationEntries).insert(
+          EvaluationEntriesCompanion.insert(
+            evaluationId: evaluationId,
+            criterionId: criterionId,
+            score: score,
+            note: Value(normalizedNote),
+            evaluatedAt: Value(now),
+          ),
+        );
+      } else {
+        await (update(evaluationEntries)..where((row) => row.id.equals(existing.id))).write(
+          EvaluationEntriesCompanion(
+            score: Value(score),
+            note: Value(normalizedNote),
+            evaluatedAt: Value(now),
+          ),
+        );
+      }
       await _refreshEvaluationStatus(evaluationId);
     });
   }
