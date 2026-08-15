@@ -168,7 +168,14 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
     for (final row in evaluationRows) {
       final evaluation = row.readTable(evaluations);
       final student = row.readTable(students);
-      final entries = await (select(evaluationEntries)..where((item) => item.evaluationId.equals(evaluation.id))).get();
+      final entries = await (select(evaluationEntries)
+            ..where((item) => item.evaluationId.equals(evaluation.id))
+            ..orderBy([(item) => OrderingTerm.asc(item.criterionId)]))
+          .get();
+      final observations = await (select(observationNotes)
+            ..where((item) => item.evaluationId.equals(evaluation.id))
+            ..orderBy([(item) => OrderingTerm.asc(item.createdAt)]))
+          .get();
       final mapped = <StudentCriterionResult>[];
       for (final entry in entries) {
         final criterion = criteria.firstWhere((item) => item.id == entry.criterionId);
@@ -179,6 +186,7 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
             title: criterion.title,
             score: entry.score,
             maxScore: criterion.maxScore,
+            note: entry.note,
           ),
         );
       }
@@ -189,6 +197,7 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
           status: evaluation.status,
           note: evaluation.note,
           entries: mapped,
+          observations: observations,
         ),
       );
     }

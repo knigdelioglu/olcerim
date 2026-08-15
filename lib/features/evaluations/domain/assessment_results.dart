@@ -62,6 +62,7 @@ class StudentResult {
     required this.status,
     required this.note,
     required this.entries,
+    required this.observations,
   });
 
   final int evaluationId;
@@ -69,9 +70,11 @@ class StudentResult {
   final String status;
   final String? note;
   final List<StudentCriterionResult> entries;
+  final List<ObservationNote> observations;
 
   bool get hasScore => entries.isNotEmpty;
   double get total => entries.fold(0, (sum, item) => sum + item.score);
+  int get criterionNoteCount => entries.where((item) => item.note?.isNotEmpty == true).length;
 }
 
 class StudentCriterionResult {
@@ -80,10 +83,12 @@ class StudentCriterionResult {
     required this.title,
     required this.score,
     required this.maxScore,
+    required this.note,
   });
 
   final int criterionId;
   final String title;
   final double score;
   final double maxScore;
+  final String? note;
 }

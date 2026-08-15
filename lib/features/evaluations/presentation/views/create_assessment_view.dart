@@ -4,6 +4,7 @@ import 'package:olcerim/core/database/app_database.dart';
 import 'package:olcerim/core/database/daos/school_dao.dart';
 import 'package:olcerim/features/classrooms/presentation/controllers/classroom_providers.dart';
 import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
+import 'package:olcerim/features/evaluations/domain/quick_scale.dart';
 import 'package:olcerim/features/evaluations/presentation/controllers/evaluation_providers.dart';
 import 'package:olcerim/features/rubrics/presentation/controllers/rubric_providers.dart';
 import 'package:olcerim/features/rubrics/presentation/views/rubric_editor_view.dart';
@@ -24,11 +25,13 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
   int step = 0;
   int? classroomId;
   int? rubricId;
+  String quickScalePresetId = QuickScalePreset.descriptiveFour.id;
   AssessmentType type = AssessmentType.rubric;
   final title = TextEditingController();
   final description = TextEditingController();
   DateTime date = DateTime.now();
   bool saving = false;
+  bool showPastYears = false;
 
   @override
   void initState() {
@@ -45,14 +48,26 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
 
   @override
   Widget build(BuildContext context) {
-    final classrooms = ref.watch(classroomsProvider(null)).valueOrNull ?? const <ClassroomSummaryRow>[];
+    final allClassrooms = ref.watch(classroomsProvider(null)).valueOrNull ?? const <ClassroomSummaryRow>[];
+    final activeYear = ref.watch(activeSchoolYearProvider).valueOrNull;
     final rubrics = ref.watch(availableRubricsProvider).valueOrNull ?? const <Rubric>[];
+    final selectedClassroom = _findClassroom(allClassrooms, classroomId);
+    final selectedIsOutsideActiveYear = activeYear != null &&
+        selectedClassroom != null &&
+        selectedClassroom.schoolYear.id != activeYear.id;
+    final useAllYears = showPastYears || selectedIsOutsideActiveYear || activeYear == null;
+    final classrooms = useAllYears
+        ? allClassrooms
+        : allClassrooms.where((item) => item.schoolYear.id == activeYear.id).toList();
+    final hasPastYears = activeYear != null &&
+        allClassrooms.any((item) => item.schoolYear.id != activeYear.id);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Yeni değerlendirme')),
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
+          constraints: const BoxConstraints(maxWidth: 760),
           child: Stepper(
             currentStep: step,
             onStepContinue: () => step == 3 ? _save() : setState(() => step++),
@@ -76,43 +91,49 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
               Step(
                 title: const Text('Sınıf'),
                 isActive: step >= 0,
-                content: RadioGroup<int>(
-                  groupValue: classroomId,
-                  onChanged: (value) => setState(() => classroomId = value),
-                  child: Column(
-                    children: classrooms
-                        .map(
-                          (item) => RadioListTile<int>(
-                            value: item.classroom.id,
-                            title: Text(item.classroom.name),
-                            subtitle: Text(item.course.name),
-                          ),
-                        )
-                        .toList(),
-                  ),
+                content: _classrooms(
+                  classrooms: classrooms,
+                  activeYear: activeYear,
+                  hasPastYears: hasPastYears,
                 ),
               ),
               Step(
                 title: const Text('Değerlendirme tipi'),
                 isActive: step >= 1,
-                content: SegmentedButton<AssessmentType>(
-                  segments: AssessmentType.values
-                      .map(
-                        (item) => ButtonSegment(
-                          value: item,
-                          label: Text(item.label),
-                          icon: Icon(item == AssessmentType.rubric ? Icons.rule : Icons.speed),
-                        ),
-                      )
-                      .toList(),
-                  selected: {type},
-                  onSelectionChanged: (values) => setState(() => type = values.first),
+                content: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SegmentedButton<AssessmentType>(
+                      segments: AssessmentType.values
+                          .map(
+                            (item) => ButtonSegment(
+                              value: item,
+                              label: Text(item.label),
+                              icon: Icon(item == AssessmentType.rubric ? Icons.rule : Icons.speed),
+                            ),
+                          )
+                          .toList(),
+                      selected: {type},
+                      onSelectionChanged: (values) => setState(() {
+                        type = values.first;
+                        if (type == AssessmentType.quickScale) rubricId = null;
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      type == AssessmentType.rubric
+                          ? 'Birden fazla kriteri ayrı ayrı puanlamak için Rubrik kullanın.'
+                          : 'Ders sırasında her öğrenciye tek dokunuşla tek bir genel düzey vermek için Hızlı Derecelendirme kullanın.',
+                    ),
+                  ],
                 ),
               ),
               Step(
-                title: const Text('Rubrik / ölçek'),
+                title: Text(type == AssessmentType.rubric ? 'Rubrik' : 'Hızlı ölçek'),
                 isActive: step >= 2,
-                content: _rubrics(context, rubrics),
+                content: type == AssessmentType.rubric
+                    ? _rubrics(context, rubrics)
+                    : _quickScales(),
               ),
               Step(title: const Text('Detay'), isActive: step >= 3, content: _details()),
             ],
@@ -125,19 +146,67 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
   bool get _canContinue => switch (step) {
         0 => classroomId != null,
         1 => true,
-        2 => rubricId != null,
+        2 => type == AssessmentType.rubric ? rubricId != null : quickScalePresetId.isNotEmpty,
         _ => title.text.trim().isNotEmpty,
       };
+
+  Widget _classrooms({
+    required List<ClassroomSummaryRow> classrooms,
+    required SchoolYear? activeYear,
+    required bool hasPastYears,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (activeYear != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Aktif eğitim yılı: ${activeYear.label}'),
+          ),
+        if (classrooms.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('Bu eğitim yılında değerlendirilecek aktif sınıf bulunmuyor.'),
+          ),
+        RadioGroup<int>(
+          groupValue: classroomId,
+          onChanged: (value) => setState(() => classroomId = value),
+          child: Column(
+            children: classrooms
+                .map(
+                  (item) => RadioListTile<int>(
+                    value: item.classroom.id,
+                    title: Text(item.classroom.name),
+                    subtitle: Text('${item.course.name} · ${item.schoolYear.label}'),
+                    secondary: item.schoolYear.isActive
+                        ? const Tooltip(message: 'Aktif eğitim yılı', child: Icon(Icons.check_circle_outline))
+                        : null,
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        if (hasPastYears)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: showPastYears,
+            onChanged: (value) => setState(() => showPastYears = value ?? false),
+            title: const Text('Geçmiş eğitim yıllarındaki sınıfları da göster'),
+          ),
+      ],
+    );
+  }
 
   Widget _rubrics(BuildContext context, List<Rubric> items) => RadioGroup<int>(
         groupValue: rubricId,
         onChanged: (value) => setState(() => rubricId = value),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (items.isEmpty)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
-                child: Text('Henüz rubrik yok. Önce bir rubrik veya ölçek oluşturun.'),
+                child: Text('Henüz rubrik yok. Önce bir rubrik oluşturun.'),
               ),
             ...items.map(
               (item) => RadioListTile<int>(
@@ -146,17 +215,57 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
                 subtitle: item.description == null ? null : Text(item.description!),
               ),
             ),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RubricEditorView()),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Yeni rubrik oluştur'),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RubricEditorView()),
+                  );
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Yeni rubrik oluştur'),
+              ),
             ),
           ],
+        ),
+      );
+
+  Widget _quickScales() => RadioGroup<String>(
+        groupValue: quickScalePresetId,
+        onChanged: (value) => setState(() {
+          if (value != null) quickScalePresetId = value;
+        }),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: QuickScalePreset.values
+              .map(
+                (preset) => Card(
+                  child: RadioListTile<String>(
+                    value: preset.id,
+                    title: Text(preset.label),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(preset.description),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: preset.levels
+                                .map((level) => Chip(label: Text(level.label)))
+                                .toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       );
 
@@ -184,6 +293,14 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
         ],
       );
 
+  ClassroomSummaryRow? _findClassroom(List<ClassroomSummaryRow> items, int? id) {
+    if (id == null) return null;
+    for (final item in items) {
+      if (item.classroom.id == id) return item;
+    }
+    return null;
+  }
+
   Future<void> _pickDate() async {
     final selected = await showDatePicker(
       context: context,
@@ -195,17 +312,26 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
   }
 
   Future<void> _save() async {
-    if (!_canContinue || classroomId == null || rubricId == null) return;
+    if (!_canContinue || classroomId == null) return;
     setState(() => saving = true);
     try {
-      final id = await ref.read(assessmentRepositoryProvider).create(
-            classroomId: classroomId!,
-            rubricId: rubricId!,
-            type: type,
-            title: title.text,
-            description: description.text,
-            assessmentDate: date,
-          );
+      final repository = ref.read(assessmentRepositoryProvider);
+      final id = type == AssessmentType.quickScale
+          ? await repository.createQuickScale(
+              classroomId: classroomId!,
+              preset: QuickScalePreset.byId(quickScalePresetId),
+              title: title.text,
+              description: description.text,
+              assessmentDate: date,
+            )
+          : await repository.create(
+              classroomId: classroomId!,
+              rubricId: rubricId!,
+              type: AssessmentType.rubric,
+              title: title.text,
+              description: description.text,
+              assessmentDate: date,
+            );
       if (mounted) Navigator.pop(context, id);
     } catch (_) {
       if (mounted) {

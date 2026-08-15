@@ -9,6 +9,7 @@ import 'package:olcerim/core/database/tables/rubric_levels.dart';
 import 'package:olcerim/core/database/tables/rubrics.dart';
 import 'package:olcerim/core/database/tables/students.dart';
 import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
+import 'package:olcerim/features/evaluations/domain/quick_scale.dart';
 
 part 'assessment_dao.g.dart';
 
@@ -72,19 +73,86 @@ class AssessmentDao extends DatabaseAccessor<AppDatabase> with _$AssessmentDaoMi
   }) async {
     return transaction(() async {
       final snapshotRubricId = await _snapshotRubric(rubricId);
-      final assessmentId = await into(assessments).insert(
-        AssessmentsCompanion.insert(
-          classroomId: classroomId,
-          rubricId: snapshotRubricId,
-          type: type.storageValue,
-          title: title.trim(),
-          description: Value(description?.trim().isEmpty == true ? null : description?.trim()),
-          assessmentDate: assessmentDate,
+      return _insertAssessmentWithEvaluations(
+        classroomId: classroomId,
+        rubricId: snapshotRubricId,
+        type: type,
+        title: title,
+        description: description,
+        assessmentDate: assessmentDate,
+      );
+    });
+  }
+
+  Future<int> createQuickScaleAssessment({
+    required int classroomId,
+    required QuickScalePreset preset,
+    required String title,
+    String? description,
+    required DateTime assessmentDate,
+  }) async {
+    return transaction(() async {
+      final rubricId = await into(rubrics).insert(
+        RubricsCompanion.insert(
+          title: 'Hızlı ölçek · ${preset.label}',
+          description: Value(preset.description),
+          isTemplate: const Value(false),
         ),
       );
-      final classroomStudents = await (select(students)
-            ..where((row) => row.classroomId.equals(classroomId) & row.archived.equals(false)))
-          .get();
+      final criterionId = await into(rubricCriteria).insert(
+        RubricCriteriaCompanion.insert(
+          rubricId: rubricId,
+          title: 'Genel değerlendirme',
+          description: const Value('Hızlı derecelendirme ölçeğinin tek puanlama boyutu.'),
+          maxScore: preset.maxScore,
+        ),
+      );
+      for (var index = 0; index < preset.levels.length; index++) {
+        final level = preset.levels[index];
+        await into(rubricLevels).insert(
+          RubricLevelsCompanion.insert(
+            criterionId: criterionId,
+            label: level.label,
+            score: level.score,
+            sortOrder: Value(index),
+          ),
+        );
+      }
+      return _insertAssessmentWithEvaluations(
+        classroomId: classroomId,
+        rubricId: rubricId,
+        type: AssessmentType.quickScale,
+        title: title,
+        description: description,
+        assessmentDate: assessmentDate,
+      );
+    });
+  }
+
+  Future<int> _insertAssessmentWithEvaluations({
+    required int classroomId,
+    required int rubricId,
+    required AssessmentType type,
+    required String title,
+    String? description,
+    required DateTime assessmentDate,
+  }) async {
+    final normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) throw ArgumentError('Değerlendirme adı boş olamaz.');
+    final assessmentId = await into(assessments).insert(
+      AssessmentsCompanion.insert(
+        classroomId: classroomId,
+        rubricId: rubricId,
+        type: type.storageValue,
+        title: normalizedTitle,
+        description: Value(description?.trim().isEmpty == true ? null : description?.trim()),
+        assessmentDate: assessmentDate,
+      ),
+    );
+    final classroomStudents = await (select(students)
+          ..where((row) => row.classroomId.equals(classroomId) & row.archived.equals(false)))
+        .get();
+    if (classroomStudents.isNotEmpty) {
       await batch(
         (batch) => batch.insertAll(
           evaluations,
@@ -93,8 +161,8 @@ class AssessmentDao extends DatabaseAccessor<AppDatabase> with _$AssessmentDaoMi
               .toList(),
         ),
       );
-      return assessmentId;
-    });
+    }
+    return assessmentId;
   }
 
   Future<int> _snapshotRubric(int sourceId) async {

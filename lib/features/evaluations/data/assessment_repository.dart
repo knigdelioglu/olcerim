@@ -1,6 +1,7 @@
 import 'package:olcerim/core/database/app_database.dart';
 import 'package:olcerim/core/database/daos/assessment_dao.dart';
 import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
+import 'package:olcerim/features/evaluations/domain/quick_scale.dart';
 
 class AssessmentRepository {
   AssessmentRepository(this._database);
@@ -23,6 +24,21 @@ class AssessmentRepository {
         classroomId: classroomId,
         rubricId: rubricId,
         type: type,
+        title: title,
+        description: description,
+        assessmentDate: assessmentDate,
+      );
+
+  Future<int> createQuickScale({
+    required int classroomId,
+    required QuickScalePreset preset,
+    required String title,
+    String? description,
+    required DateTime assessmentDate,
+  }) =>
+      _database.assessmentDao.createQuickScaleAssessment(
+        classroomId: classroomId,
+        preset: preset,
         title: title,
         description: description,
         assessmentDate: assessmentDate,

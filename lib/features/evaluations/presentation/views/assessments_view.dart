@@ -7,6 +7,7 @@ import 'package:olcerim/features/evaluations/presentation/controllers/evaluation
 import 'package:olcerim/features/evaluations/presentation/views/assessment_results_view.dart';
 import 'package:olcerim/features/evaluations/presentation/views/create_assessment_view.dart';
 import 'package:olcerim/features/evaluations/presentation/views/grading_session_view.dart';
+import 'package:olcerim/features/evaluations/presentation/views/quick_scale_grading_view.dart';
 
 class AssessmentsView extends ConsumerStatefulWidget {
   const AssessmentsView({super.key});
@@ -81,16 +82,12 @@ class _AssessmentCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = row.totalCount == 0 ? 0.0 : row.completedCount / row.totalCount;
+    final type = AssessmentType.fromStorage(row.assessment.type);
+    final description = row.assessment.description?.trim();
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => row.assessment.status == AssessmentStatus.completed.storageValue
-                ? AssessmentResultsView(assessmentId: row.assessment.id)
-                : GradingSessionView(assessmentId: row.assessment.id),
-          ),
-        ),
+        onTap: () => _open(context, type),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -98,6 +95,8 @@ class _AssessmentCard extends ConsumerWidget {
             children: [
               Row(
                 children: [
+                  Icon(type == AssessmentType.quickScale ? Icons.speed : Icons.rule),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(row.assessment.title, style: Theme.of(context).textTheme.titleLarge),
                   ),
@@ -113,6 +112,10 @@ class _AssessmentCard extends ConsumerWidget {
                   PopupMenuButton<String>(
                     tooltip: 'Değerlendirme işlemleri',
                     onSelected: (value) async {
+                      if (value == 'open') {
+                        _open(context, type);
+                        return;
+                      }
                       if (value != 'archive') return;
                       await ref.read(assessmentRepositoryProvider).setArchived(row.assessment.id, true);
                       if (!context.mounted) return;
@@ -129,6 +132,7 @@ class _AssessmentCard extends ConsumerWidget {
                       );
                     },
                     itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'open', child: Text('Aç')),
                       PopupMenuItem(value: 'archive', child: Text('Arşivle')),
                     ],
                   ),
@@ -136,8 +140,12 @@ class _AssessmentCard extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${row.classroom.name} · ${DateFormat('d MMM y', 'tr').format(row.assessment.assessmentDate)}',
+                '${row.classroom.name} · ${DateFormat('d MMM y', 'tr').format(row.assessment.assessmentDate)} · ${type.label}',
               ),
+              if (description?.isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Text(description!, maxLines: 3, overflow: TextOverflow.ellipsis),
+              ],
               const SizedBox(height: 16),
               Text('${row.completedCount} / ${row.totalCount} tamamlandı'),
               const SizedBox(height: 6),
@@ -145,6 +153,19 @@ class _AssessmentCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _open(BuildContext context, AssessmentType type) {
+    final completed = row.assessment.status == AssessmentStatus.completed.storageValue;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => completed
+            ? AssessmentResultsView(assessmentId: row.assessment.id)
+            : type == AssessmentType.quickScale
+                ? QuickScaleGradingView(assessmentId: row.assessment.id)
+                : GradingSessionView(assessmentId: row.assessment.id),
       ),
     );
   }
@@ -171,7 +192,7 @@ class _EmptyAssessments extends StatelessWidget {
               Text(
                 filtered
                     ? 'Başka bir durum filtresi seçebilirsiniz.'
-                    : 'Bir sınıf ve rubrik seçerek ilk değerlendirmeyi oluşturun.',
+                    : 'Bir sınıf seçip Rubrik veya Hızlı Derecelendirme ile ilk değerlendirmeyi oluşturun.',
                 textAlign: TextAlign.center,
               ),
             ],
