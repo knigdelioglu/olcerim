@@ -85,7 +85,7 @@ StudentFilePreview _parseStudentList(Uint8List bytes, String extension) {
   } on Failure {
     rethrow;
   } catch (error) {
-    throw ImportFailure('Dosya okunamadı. Dosyanın Excel (.xlsx) veya CSV biçiminde olduğundan emin olun.', cause: error);
+    throw ImportFailure('Dosya okunamadı. Dosyanın Excel (.xlsx) veya CSV biçiminde olduğundan emin olun.', error);
   }
 }
 

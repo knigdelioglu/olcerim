@@ -80,9 +80,9 @@ class BackupRestoreService {
     } on BackupFailure {
       rethrow;
     } on SecretBoxAuthenticationError catch (error) {
-      throw BackupFailure('Parola yanlış veya yedek dosyası değiştirilmiş.', cause: error);
+      throw BackupFailure('Parola yanlış veya yedek dosyası değiştirilmiş.', error);
     } catch (error) {
-      throw BackupFailure('Yedek açılamadı. Dosya bozuk veya parola yanlış olabilir.', cause: error);
+      throw BackupFailure('Yedek açılamadı. Dosya bozuk veya parola yanlış olabilir.', error);
     }
   }
 }
