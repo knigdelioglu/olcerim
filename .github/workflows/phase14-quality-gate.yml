@@ -1,6 +1,8 @@
 name: Phase 14 Quality Gate
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
