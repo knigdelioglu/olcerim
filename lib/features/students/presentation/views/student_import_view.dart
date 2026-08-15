@@ -1,25 +1,143 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
-class StudentImportView extends StatelessWidget {
-  const StudentImportView({super.key});
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:olcerim/core/database/daos/student_dao.dart';
+import 'package:olcerim/core/services/excel_service.dart';
+import 'package:olcerim/features/students/presentation/controllers/student_providers.dart';
+
+class StudentImportView extends ConsumerStatefulWidget {
+  const StudentImportView({this.classroomId, super.key});
+  final int? classroomId;
+
+  @override
+  ConsumerState<StudentImportView> createState() => _StudentImportViewState();
+}
+
+class _StudentImportViewState extends ConsumerState<StudentImportView> {
+  final service = ExcelService();
+  StudentFilePreview? preview;
+  StudentPreviewValidation? validation;
+  int? nameColumn;
+  int? numberColumn;
+  String? fileName;
+  bool busy = false;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text('Öğrenciler', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        const Text('Excel/CSV sınıf listesini içe aktarın ve yerel veritabanında saklayın.'),
-        const SizedBox(height: 24),
-        FilledButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.upload_file),
-          label: const Text('Excel’den yükle'),
+    if (widget.classroomId == null) {
+      return const Scaffold(body: Center(child: Text('Öğrenci içe aktarmak için önce bir sınıf açın.')));
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Öğrenci içe aktar')),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Excel veya CSV sınıf listenizi seçin', style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 8),
+                const Text('Dosya yalnız cihazınızda okunur. İçe aktarmadan önce kolonları ve hatalı satırları kontrol edebilirsiniz.'),
+                const SizedBox(height: 24),
+                FilledButton.tonalIcon(onPressed: busy ? null : _pickFile, icon: const Icon(Icons.file_open), label: Text(fileName ?? 'Dosya seç')),
+                if (busy) const Padding(padding: EdgeInsets.only(top: 16), child: LinearProgressIndicator()),
+                if (preview case final data?) ...[
+                  const SizedBox(height: 24),
+                  _columnSelector(data),
+                  const SizedBox(height: 16),
+                  _previewTable(data),
+                  if (validation case final result?) ...[
+                    const SizedBox(height: 16),
+                    if (result.errors.isNotEmpty)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${result.errors.length} satırda sorun bulundu', style: Theme.of(context).textTheme.titleMedium), const SizedBox(height: 8), ...result.errors.take(8).map(Text.new)]),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    FilledButton(onPressed: result.isValid && !busy ? _import : null, child: Text('${result.validRows.length} öğrenciyi içe aktar')),
+                  ],
+                ],
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        const Text('Dosya seçme ve isolate tabanlı parse akışı servis katmanına bağlanacak.'),
+      ),
+    );
+  }
+
+  Widget _columnSelector(StudentFilePreview data) {
+    final items = List.generate(data.headers.length, (index) => DropdownMenuItem<int>(value: index, child: Text(data.headers[index].isEmpty ? 'Kolon ${index + 1}' : data.headers[index])));
+    return Row(
+      children: [
+        Expanded(child: DropdownButtonFormField<int>(initialValue: nameColumn, decoration: const InputDecoration(labelText: 'Ad soyad kolonu'), items: items, onChanged: (value) => setState(() { nameColumn = value; _validate(); }))),
+        const SizedBox(width: 12),
+        Expanded(child: DropdownButtonFormField<int>(initialValue: numberColumn, decoration: const InputDecoration(labelText: 'Okul no kolonu (opsiyonel)'), items: [const DropdownMenuItem<int>(value: null, child: Text('Yok')), ...items], onChanged: (value) => setState(() { numberColumn = value; _validate(); }))),
       ],
     );
+  }
+
+  Widget _previewTable(StudentFilePreview data) {
+    final columns = data.headers.map((header) => DataColumn(label: Text(header.isEmpty ? 'Kolon' : header))).toList();
+    final rows = data.rows.take(8).map((row) => DataRow(cells: List.generate(columns.length, (index) => DataCell(Text(index < row.length ? row[index] : ''))))).toList();
+    return SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columns: columns, rows: rows));
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['xlsx', 'csv'], withData: true);
+    if (result == null) return;
+    final file = result.files.single;
+    Uint8List? bytes = file.bytes;
+    if (bytes == null && file.path != null) bytes = await XFile(file.path!).readAsBytes();
+    if (bytes == null) return;
+    setState(() { busy = true; fileName = file.name; });
+    try {
+      final parsed = await service.parseStudentList(bytes, file.extension ?? '');
+      setState(() {
+        preview = parsed;
+        nameColumn = parsed.suggestedNameColumn;
+        numberColumn = parsed.suggestedNumberColumn;
+        busy = false;
+        _validate();
+      });
+    } catch (error) {
+      setState(() => busy = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
+
+  void _validate() {
+    final data = preview;
+    final name = nameColumn;
+    if (data == null || name == null) {
+      validation = null;
+      return;
+    }
+    validation = service.validate(data, nameColumn: name, numberColumn: numberColumn);
+  }
+
+  Future<void> _import() async {
+    final result = validation;
+    if (result == null || !result.isValid) return;
+    setState(() => busy = true);
+    try {
+      await ref.read(studentRepositoryProvider).importStudents(
+            widget.classroomId!,
+            result.validRows.map((row) => StudentImportRecord(fullName: row.fullName, schoolNumber: row.schoolNumber)).toList(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${result.validRows.length} öğrenci içe aktarıldı.')));
+      Navigator.pop(context);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Öğrenciler içe aktarılamadı. Sınıfta tekrar eden okul numarası olabilir.')));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 }

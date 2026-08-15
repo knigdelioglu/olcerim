@@ -1,25 +1,21 @@
-import 'package:drift/drift.dart';
 import 'package:olcerim/core/database/app_database.dart';
 import 'package:olcerim/core/database/daos/student_dao.dart';
-import 'package:olcerim/core/services/excel_service.dart';
 
 class StudentRepository {
-  const StudentRepository(this._dao);
+  StudentRepository(this._database);
+  final AppDatabase _database;
 
-  final StudentDao _dao;
+  Stream<List<Student>> watchStudents(int classroomId, {bool archived = false}) =>
+      _database.studentDao.watchStudents(classroomId, archived: archived);
 
-  Stream<List<Student>> watchAll() => _dao.watchAllStudents();
+  Future<List<Student>> studentsForClassroom(int classroomId) =>
+      _database.studentDao.studentsForClassroom(classroomId);
 
-  Future<void> importStudents(List<ImportedStudent> students) {
-    final rows = students
-        .map(
-          (student) => StudentsCompanion.insert(
-            fullName: student.fullName,
-            className: student.className,
-            schoolNumber: Value(student.schoolNumber),
-          ),
-        )
-        .toList(growable: false);
-    return _dao.insertMultipleStudents(rows);
-  }
+  Future<int> saveStudent({int? id, required int classroomId, String? schoolNumber, required String fullName}) =>
+      _database.studentDao.saveStudent(id: id, classroomId: classroomId, schoolNumber: schoolNumber, fullName: fullName);
+
+  Future<void> importStudents(int classroomId, List<StudentImportRecord> records) =>
+      _database.studentDao.insertMultipleStudents(classroomId, records);
+
+  Future<void> setArchived(int id, bool archived) => _database.studentDao.setArchived(id, archived);
 }
