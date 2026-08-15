@@ -4,6 +4,7 @@ import 'package:olcerim/core/database/daos/school_dao.dart';
 import 'package:olcerim/features/classrooms/presentation/controllers/classroom_providers.dart';
 import 'package:olcerim/features/classrooms/presentation/views/classroom_detail_view.dart';
 import 'package:olcerim/features/classrooms/presentation/views/classroom_form_view.dart';
+import 'package:olcerim/features/students/presentation/views/student_import_view.dart';
 
 class ClassroomsView extends ConsumerStatefulWidget {
   const ClassroomsView({super.key});
@@ -46,32 +47,55 @@ class _ClassroomsViewState extends ConsumerState<ClassroomsView> {
             if (years.isNotEmpty)
               DropdownButton<int>(
                 value: selectedYearId,
-                items: years.map((year) => DropdownMenuItem(value: year.id, child: Text(year.label))).toList(),
+                items: years
+                    .map((year) => DropdownMenuItem(value: year.id, child: Text(year.label)))
+                    .toList(),
                 onChanged: (value) => setState(() => selectedYearId = value),
               ),
             const SizedBox(height: 12),
             Expanded(
               child: classrooms.when(
                 data: (items) {
+                  final needle = query.trim().toLowerCase();
                   final filtered = items.where((item) {
-                    final needle = query.toLowerCase();
-                    return needle.isEmpty || item.classroom.name.toLowerCase().contains(needle) || item.course.name.toLowerCase().contains(needle);
+                    return needle.isEmpty ||
+                        item.classroom.name.toLowerCase().contains(needle) ||
+                        item.course.name.toLowerCase().contains(needle);
                   }).toList();
-                  if (filtered.isEmpty) return _EmptyClassrooms(onCreate: selectedYearId == null ? null : () => _openForm(context, selectedYearId!));
+                  if (filtered.isEmpty) {
+                    return _EmptyClassrooms(
+                      onCreate: selectedYearId == null ? null : () => _openForm(context, selectedYearId!),
+                    );
+                  }
                   return LayoutBuilder(
                     builder: (context, constraints) {
-                      final columns = constraints.maxWidth >= 1100 ? 3 : constraints.maxWidth >= 640 ? 2 : 1;
+                      final columns = constraints.maxWidth >= 1100
+                          ? 3
+                          : constraints.maxWidth >= 640
+                              ? 2
+                              : 1;
                       if (columns == 1) {
                         return ListView.separated(
                           itemCount: filtered.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (_, index) => _ClassroomCard(item: filtered[index], onOpen: () => _openDetail(filtered[index])),
+                          itemBuilder: (_, index) => _ClassroomCard(
+                            item: filtered[index],
+                            onOpen: () => _openDetail(filtered[index]),
+                          ),
                         );
                       }
                       return GridView.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 2.4),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 2.25,
+                        ),
                         itemCount: filtered.length,
-                        itemBuilder: (_, index) => _ClassroomCard(item: filtered[index], onOpen: () => _openDetail(filtered[index])),
+                        itemBuilder: (_, index) => _ClassroomCard(
+                          item: filtered[index],
+                          onOpen: () => _openDetail(filtered[index]),
+                        ),
                       );
                     },
                   );
@@ -87,11 +111,15 @@ class _ClassroomsViewState extends ConsumerState<ClassroomsView> {
   }
 
   void _openDetail(ClassroomSummaryRow item) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ClassroomDetailView(classroomId: item.classroom.id)));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ClassroomDetailView(classroomId: item.classroom.id)),
+    );
   }
 
   Future<void> _openForm(BuildContext context, int yearId) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ClassroomFormView(initialSchoolYearId: yearId)));
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ClassroomFormView(initialSchoolYearId: yearId)),
+    );
   }
 
   Future<void> _showSearch(BuildContext context) async {
@@ -100,10 +128,21 @@ class _ClassroomsViewState extends ConsumerState<ClassroomsView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Sınıf ara'),
-        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Sınıf veya ders')),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')), FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Uygula'))],
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Sınıf veya ders'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Uygula'),
+          ),
+        ],
       ),
     );
+    controller.dispose();
     if (value != null) setState(() => query = value);
   }
 }
@@ -126,31 +165,66 @@ class _ClassroomCard extends ConsumerWidget {
             children: [
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(item.classroom.name, style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 4),
                     Text(item.course.name),
-                    const Spacer(),
-                    Text('${item.studentCount} öğrenci · ${item.schoolYear.label}', style: Theme.of(context).textTheme.bodyMedium),
+                    const SizedBox(height: 14),
+                    Text(
+                      '${item.studentCount} öğrenci · ${item.schoolYear.label}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
                 tooltip: 'Sınıf işlemleri',
                 onSelected: (value) async {
-                  if (value == 'archive') {
-                    await ref.read(classroomRepositoryProvider).setArchived(item.classroom.id, true);
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${item.classroom.name} arşivlendi'), action: SnackBarAction(label: 'Geri al', onPressed: () => ref.read(classroomRepositoryProvider).setArchived(item.classroom.id, false))),
-                    );
-                  } else {
-                    onOpen();
+                  switch (value) {
+                    case 'open':
+                      onOpen();
+                    case 'edit':
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ClassroomFormView(
+                            initialSchoolYearId: item.schoolYear.id,
+                            classroomId: item.classroom.id,
+                            initialName: item.classroom.name,
+                            initialCourseName: item.course.name,
+                            initialDescription: item.classroom.description,
+                          ),
+                        ),
+                      );
+                    case 'import':
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StudentImportView(classroomId: item.classroom.id),
+                        ),
+                      );
+                    case 'archive':
+                      await ref.read(classroomRepositoryProvider).setArchived(item.classroom.id, true);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${item.classroom.name} arşivlendi'),
+                          action: SnackBarAction(
+                            label: 'Geri al',
+                            onPressed: () => ref
+                                .read(classroomRepositoryProvider)
+                                .setArchived(item.classroom.id, false),
+                          ),
+                        ),
+                      );
                   }
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(value: 'open', child: Text('Sınıfı aç')),
+                  PopupMenuItem(value: 'edit', child: Text('Düzenle')),
+                  PopupMenuItem(value: 'import', child: Text('Öğrenci içe aktar')),
                   PopupMenuItem(value: 'archive', child: Text('Arşivle')),
                 ],
               ),
@@ -165,6 +239,7 @@ class _ClassroomCard extends ConsumerWidget {
 class _EmptyClassrooms extends StatelessWidget {
   const _EmptyClassrooms({this.onCreate});
   final VoidCallback? onCreate;
+
   @override
   Widget build(BuildContext context) => Center(
         child: ConstrainedBox(
@@ -176,7 +251,10 @@ class _EmptyClassrooms extends StatelessWidget {
               const SizedBox(height: 16),
               Text('Henüz sınıfınız yok', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
-              const Text('Öğrencilerinizi değerlendirmeye başlamak için ilk sınıfınızı oluşturun.', textAlign: TextAlign.center),
+              const Text(
+                'Öğrencilerinizi değerlendirmeye başlamak için ilk sınıfınızı oluşturun.',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
               FilledButton(onPressed: onCreate, child: const Text('Sınıf oluştur')),
             ],

@@ -1,5 +1,6 @@
 abstract final class AppConstants {
   static const appName = 'Ölçerim';
+  static const appVersion = '1.0.0';
   static const databaseFileName = 'olcerim.sqlite';
   static const backupFormat = 'olcerim-backup';
   static const backupExtension = 'olcerim';
