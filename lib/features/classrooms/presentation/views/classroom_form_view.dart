@@ -141,7 +141,7 @@ class _ClassroomFormViewState extends ConsumerState<ClassroomFormView> {
         );
         ref.invalidate(classroomDetailProvider(widget.classroomId!));
       }
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, true);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
