@@ -185,6 +185,7 @@ class _ClassroomCard extends ConsumerWidget {
                   switch (value) {
                     case 'open':
                       onOpen();
+                      return;
                     case 'edit':
                       await Navigator.push(
                         context,
@@ -198,6 +199,7 @@ class _ClassroomCard extends ConsumerWidget {
                           ),
                         ),
                       );
+                      return;
                     case 'import':
                       await Navigator.push(
                         context,
@@ -205,6 +207,7 @@ class _ClassroomCard extends ConsumerWidget {
                           builder: (_) => StudentImportView(classroomId: item.classroom.id),
                         ),
                       );
+                      return;
                     case 'archive':
                       await ref.read(classroomRepositoryProvider).setArchived(item.classroom.id, true);
                       if (!context.mounted) return;
@@ -219,6 +222,7 @@ class _ClassroomCard extends ConsumerWidget {
                           ),
                         ),
                       );
+                      return;
                   }
                 },
                 itemBuilder: (_) => const [
