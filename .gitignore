@@ -1,0 +1,62 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/doc/api/
+
+# Generated source (recreate with build_runner)
+**/*.g.dart
+**/*.freezed.dart
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Android / Gradle
+**/.gradle/
+**/local.properties
+*.jks
+*.keystore
+key.properties
+
+# Xcode / CocoaPods
+**/Pods/
+**/.symlinks/
+**/Flutter/ephemeral/
+**/xcuserdata/
+**/*.xcuserstate
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.mobileprovision
+
+# Local databases, exports and teacher data
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+*.backup
+*.olcerim-backup
+exports/
+backups/
+
+# Logs / temp
+*.log
+*.tmp
+*.swp
