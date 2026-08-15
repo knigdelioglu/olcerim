@@ -5,6 +5,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Final gate is intentionally triggered only after implementation work is complete.
 jobs:
   quality-gate:
     name: Analyze, test and build
