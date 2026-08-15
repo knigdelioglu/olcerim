@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:olcerim/core/database/app_database.dart';
 import 'package:olcerim/core/database/tables/assessments.dart';
+import 'package:olcerim/core/database/tables/classrooms.dart';
 import 'package:olcerim/core/database/tables/evaluation_entries.dart';
 import 'package:olcerim/core/database/tables/evaluations.dart';
 import 'package:olcerim/core/database/tables/observation_notes.dart';
@@ -12,7 +13,16 @@ import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
 
 part 'evaluation_dao.g.dart';
 
-@DriftAccessor(tables: [Assessments, Evaluations, EvaluationEntries, ObservationNotes, Students, RubricCriteria, RubricLevels])
+@DriftAccessor(tables: [
+  Assessments,
+  Classrooms,
+  Evaluations,
+  EvaluationEntries,
+  ObservationNotes,
+  Students,
+  RubricCriteria,
+  RubricLevels,
+])
 class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMixin {
   EvaluationDao(super.db);
 

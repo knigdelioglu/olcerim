@@ -77,8 +77,8 @@ void main() {
 
   test('puan maksimum kriter puanını aşamaz', () async {
     final fixture = await assessmentFixture();
-    expect(
-      () => db.evaluationDao.upsertScore(
+    await expectLater(
+      db.evaluationDao.upsertScore(
         evaluationId: fixture.evaluationId,
         criterionId: fixture.criterionId,
         score: 21,
@@ -183,7 +183,10 @@ void main() {
 
   test('zaman damgalı gözlem notları stream üzerinden görünür', () async {
     final fixture = await assessmentFixture();
-    await db.evaluationDao.addObservation(fixture.evaluationId, 'Sunuma göz temasıyla başladı.');
+    await db.evaluationDao.addObservation(
+      fixture.evaluationId,
+      'Sunuma göz temasıyla başladı.',
+    );
     final notes = await db.evaluationDao.watchObservations(fixture.evaluationId).first;
     expect(notes, hasLength(1));
     expect(notes.single.text, 'Sunuma göz temasıyla başladı.');
