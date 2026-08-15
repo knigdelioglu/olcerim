@@ -61,7 +61,7 @@ class _BackupViewState extends ConsumerState<BackupView> {
   }
 
   Future<void> _restore() async {
-    final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: [AppConstants.backupExtension], withData: true);
+    final picked = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: [AppConstants.backupExtension], withData: true);
     if (picked == null) return;
     final file = picked.files.single;
     Uint8List? bytes = file.bytes;
