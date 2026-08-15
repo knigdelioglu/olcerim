@@ -9,18 +9,23 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_riverpod: ^3.4.2
-  riverpod_annotation: ^4.0.6
   drift: ^2.34.3
   sqlite3: ^3.5.1
   path: ^1.9.1
   path_provider: ^2.1.6
   file_picker: ^11.0.2
   share_plus: ^13.3.0
+  cross_file: ^0.3.5+2
   excel: ^4.0.6
   csv: ^8.0.0
   pdf: ^3.13.0
   printing: ^5.15.0
+  intl: ^0.20.2
+  cryptography: ^2.9.0
+  cryptography_flutter: ^2.3.4
   freezed_annotation: ^3.1.0
   json_annotation: ^4.12.0
 
@@ -31,7 +36,7 @@ dev_dependencies:
   drift_dev: ^2.34.5
   freezed: ^3.2.5
   json_serializable: ^6.14.1
-  riverpod_generator: ^4.0.8
 
 flutter:
   uses-material-design: true
+  generate: true
