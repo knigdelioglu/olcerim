@@ -5,6 +5,7 @@ import 'package:olcerim/core/database/daos/evaluation_dao.dart';
 import 'package:olcerim/core/database/database_provider.dart';
 import 'package:olcerim/features/evaluations/data/assessment_repository.dart';
 import 'package:olcerim/features/evaluations/data/evaluation_repository.dart';
+import 'package:olcerim/features/evaluations/domain/assessment_results.dart';
 
 final assessmentRepositoryProvider = Provider<AssessmentRepository>((ref) => AssessmentRepository(ref.watch(databaseProvider)));
 final evaluationRepositoryProvider = Provider<EvaluationRepository>((ref) => EvaluationRepository(ref.watch(databaseProvider)));
@@ -14,3 +15,4 @@ final assessmentStudentsProvider = StreamProvider.family<List<EvaluationStudentR
 final assessmentCriteriaProvider = FutureProvider.family<List<RubricCriterion>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).criteria(id));
 final evaluationEntriesProvider = StreamProvider.family<List<EvaluationEntry>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).watchEntries(id));
 final criterionLevelsProvider = FutureProvider.family<List<RubricLevel>, int>((ref, id) => ref.watch(evaluationRepositoryProvider).levels(id));
+final assessmentResultsProvider = FutureProvider.family<AssessmentResults, int>((ref, id) => ref.watch(evaluationRepositoryProvider).loadResults(id));
