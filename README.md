@@ -11,14 +11,15 @@
 - Sunucusuz kullanımda veri kaybına karşı sürümlü ve **şifreli tam yedekleme/geri yükleme** akışı sağlamak.
 - Yeni sürümlerde mevcut öğretmen verisini koruyan test edilebilir Drift migration'ları kullanmak.
 
-## Ürün planı ve kapsamı
+## Ürün planı, kapsamı ve UX
 
-Ölçerim 1.0 geliştirmesinde aşağıdaki iki belge ürün referansı olarak kabul edilir:
+Ölçerim 1.0 geliştirmesinde aşağıdaki üç belge ürün referansı olarak kabul edilir:
 
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — mevcut iskeletten pazarlanabilir Ölçerim 1.0'a kadar geliştirme fazları, çıkış kriterleri ve sıralama.
 - [`docs/PRODUCT_SCOPE.md`](docs/PRODUCT_SCOPE.md) — 1.0 kapsamı, kesin sınırlar, mimari invariant'lar, veri güvenliği ve Definition of Done.
+- [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md) — tasarım sistemi, renk/typography/spacing tokenları, responsive navigasyon, bileşen kuralları ve 1.0 ekranlarının telefon/tablet/macOS UX spesifikasyonları.
 
-Yeni özellikler eklenirken önce bu belgelerdeki kapsam ve sıralama korunmalıdır. Özellikle veri güvenliği, migration, backup/restore ve değerlendirme doğruluğu sonraya bırakılabilecek teknik borçlar değildir.
+Yeni özellikler eklenirken önce bu belgelerdeki kapsam, sıralama ve UX kuralları korunmalıdır. Özellikle veri güvenliği, migration, backup/restore ve değerlendirme doğruluğu sonraya bırakılabilecek teknik borçlar değildir.
 
 ## Mimari
 
