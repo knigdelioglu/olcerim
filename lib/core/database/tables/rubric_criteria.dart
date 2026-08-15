@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:olcerim/core/database/tables/rubrics.dart';
 
+@DataClassName('RubricCriterion')
 class RubricCriteria extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get rubricId => integer().references(Rubrics, #id, onDelete: KeyAction.cascade)();
