@@ -1,17 +1,138 @@
 import 'package:drift/drift.dart';
 import 'package:olcerim/core/database/app_database.dart';
-import 'package:olcerim/core/database/tables/rubric_criteria.dart';
-import 'package:olcerim/core/database/tables/rubrics.dart';
+import 'package:olcerim/features/rubrics/domain/rubric_draft.dart';
 
 part 'rubric_dao.g.dart';
 
-@DriftAccessor(tables: [Rubrics, RubricCriteria])
+@DriftAccessor(tables: [Rubrics, RubricCriteria, RubricLevels])
 class RubricDao extends DatabaseAccessor<AppDatabase> with _$RubricDaoMixin {
-  RubricDao(super.attachedDatabase);
+  RubricDao(super.db);
 
-  Stream<List<Rubric>> watchAllRubrics() {
-    return (select(rubrics)..orderBy([(row) => OrderingTerm.asc(row.title)])).watch();
+  Stream<List<RubricSummaryRow>> watchTemplates({bool archived = false}) {
+    final count = rubricCriteria.id.count();
+    final total = rubricCriteria.maxScore.sum();
+    final query = select(rubrics).join([
+      leftOuterJoin(rubricCriteria, rubricCriteria.rubricId.equalsExp(rubrics.id)),
+    ])
+      ..where(rubrics.isTemplate.equals(true) & rubrics.archived.equals(archived))
+      ..addColumns([count, total])
+      ..groupBy([rubrics.id])
+      ..orderBy([OrderingTerm.asc(rubrics.title)]);
+    return query.watch().map(
+          (rows) => rows
+              .map((row) => RubricSummaryRow(
+                    rubric: row.readTable(rubrics),
+                    criteriaCount: row.read(count) ?? 0,
+                    totalScore: row.read(total) ?? 0,
+                  ))
+              .toList(),
+        );
   }
 
-  Future<int> createRubric(RubricsCompanion rubric) => into(rubrics).insert(rubric);
+  Stream<List<Rubric>> watchAllRubrics() {
+    return (select(rubrics)
+          ..where((row) => row.isTemplate.equals(true) & row.archived.equals(false))
+          ..orderBy([(row) => OrderingTerm.asc(row.title)]))
+        .watch();
+  }
+
+  Future<RubricDraft?> loadDraft(int rubricId) async {
+    final rubric = await (select(rubrics)..where((row) => row.id.equals(rubricId))).getSingleOrNull();
+    if (rubric == null) return null;
+    final criteria = await (select(rubricCriteria)
+          ..where((row) => row.rubricId.equals(rubricId))
+          ..orderBy([(row) => OrderingTerm.asc(row.sortOrder)]))
+        .get();
+    final drafts = <CriterionDraft>[];
+    for (final criterion in criteria) {
+      final levels = await (select(rubricLevels)
+            ..where((row) => row.criterionId.equals(criterion.id))
+            ..orderBy([(row) => OrderingTerm.asc(row.sortOrder)]))
+          .get();
+      drafts.add(CriterionDraft(
+        id: criterion.id,
+        title: criterion.title,
+        description: criterion.description ?? '',
+        maxScore: criterion.maxScore,
+        levels: levels.map((level) => LevelDraft(id: level.id, label: level.label, description: level.description ?? '', score: level.score)).toList(),
+      ));
+    }
+    return RubricDraft(id: rubric.id, title: rubric.title, description: rubric.description ?? '', criteria: drafts);
+  }
+
+  Future<int> saveDraft(RubricDraft draft) async {
+    if (draft.title.trim().isEmpty) throw ArgumentError('Rubrik adı boş olamaz.');
+    if (draft.criteria.isEmpty) throw ArgumentError('En az bir kriter gerekir.');
+    for (final criterion in draft.criteria) {
+      if (criterion.title.trim().isEmpty || criterion.maxScore <= 0) throw ArgumentError('Kriter adı ve puanı geçerli olmalıdır.');
+      for (final level in criterion.levels) {
+        if (level.label.trim().isEmpty || level.score < 0 || level.score > criterion.maxScore) {
+          throw ArgumentError('Performans seviyesi geçerli değil.');
+        }
+      }
+    }
+    return transaction(() async {
+      final rubricId = draft.id ??
+          await into(rubrics).insert(RubricsCompanion.insert(title: draft.title.trim(), description: Value(_nullable(draft.description)), isTemplate: const Value(true)));
+      if (draft.id != null) {
+        await (update(rubrics)..where((row) => row.id.equals(rubricId))).write(
+          RubricsCompanion(title: Value(draft.title.trim()), description: Value(_nullable(draft.description)), updatedAt: Value(DateTime.now())),
+        );
+        final oldCriteria = await (select(rubricCriteria)..where((row) => row.rubricId.equals(rubricId))).get();
+        for (final criterion in oldCriteria) {
+          await (delete(rubricLevels)..where((row) => row.criterionId.equals(criterion.id))).go();
+        }
+        await (delete(rubricCriteria)..where((row) => row.rubricId.equals(rubricId))).go();
+      }
+      for (var index = 0; index < draft.criteria.length; index++) {
+        final item = draft.criteria[index];
+        final criterionId = await into(rubricCriteria).insert(
+          RubricCriteriaCompanion.insert(
+            rubricId: rubricId,
+            title: item.title.trim(),
+            description: Value(_nullable(item.description)),
+            maxScore: item.maxScore,
+            sortOrder: Value(index),
+          ),
+        );
+        for (var levelIndex = 0; levelIndex < item.levels.length; levelIndex++) {
+          final level = item.levels[levelIndex];
+          await into(rubricLevels).insert(
+            RubricLevelsCompanion.insert(
+              criterionId: criterionId,
+              label: level.label.trim(),
+              description: Value(_nullable(level.description)),
+              score: level.score,
+              sortOrder: Value(levelIndex),
+            ),
+          );
+        }
+      }
+      return rubricId;
+    });
+  }
+
+  Future<int> duplicate(int rubricId) async {
+    final source = await loadDraft(rubricId);
+    if (source == null) throw StateError('Rubrik bulunamadı.');
+    source
+      ..id = null
+      ..title = '${source.title} Kopya';
+    return saveDraft(source);
+  }
+
+  Future<void> setArchived(int rubricId, bool archived) {
+    return (update(rubrics)..where((row) => row.id.equals(rubricId) & row.isTemplate.equals(true))).write(
+      RubricsCompanion(archived: Value(archived), updatedAt: Value(DateTime.now())),
+    );
+  }
+
+  String? _nullable(String value) => value.trim().isEmpty ? null : value.trim();
+}
+
+class RubricSummaryRow {
+  const RubricSummaryRow({required this.rubric, required this.criteriaCount, required this.totalScore});
+  final Rubric rubric;
+  final int criteriaCount;
+  final double totalScore;
 }
