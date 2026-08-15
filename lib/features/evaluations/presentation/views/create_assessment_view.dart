@@ -76,18 +76,20 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
               Step(
                 title: const Text('Sınıf'),
                 isActive: step >= 0,
-                content: Column(
-                  children: classrooms
-                      .map(
-                        (item) => RadioListTile<int>(
-                          value: item.classroom.id,
-                          groupValue: classroomId,
-                          title: Text(item.classroom.name),
-                          subtitle: Text(item.course.name),
-                          onChanged: (value) => setState(() => classroomId = value),
-                        ),
-                      )
-                      .toList(),
+                content: RadioGroup<int>(
+                  groupValue: classroomId,
+                  onChanged: (value) => setState(() => classroomId = value),
+                  child: Column(
+                    children: classrooms
+                        .map(
+                          (item) => RadioListTile<int>(
+                            value: item.classroom.id,
+                            title: Text(item.classroom.name),
+                            subtitle: Text(item.course.name),
+                          ),
+                        )
+                        .toList(),
+                  ),
                 ),
               ),
               Step(
@@ -127,33 +129,35 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
         _ => title.text.trim().isNotEmpty,
       };
 
-  Widget _rubrics(BuildContext context, List<Rubric> items) => Column(
-        children: [
-          if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 12),
-              child: Text('Henüz rubrik yok. Önce bir rubrik veya ölçek oluşturun.'),
+  Widget _rubrics(BuildContext context, List<Rubric> items) => RadioGroup<int>(
+        groupValue: rubricId,
+        onChanged: (value) => setState(() => rubricId = value),
+        child: Column(
+          children: [
+            if (items.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text('Henüz rubrik yok. Önce bir rubrik veya ölçek oluşturun.'),
+              ),
+            ...items.map(
+              (item) => RadioListTile<int>(
+                value: item.id,
+                title: Text(item.title),
+                subtitle: item.description == null ? null : Text(item.description!),
+              ),
             ),
-          ...items.map(
-            (item) => RadioListTile<int>(
-              value: item.id,
-              groupValue: rubricId,
-              title: Text(item.title),
-              subtitle: item.description == null ? null : Text(item.description!),
-              onChanged: (value) => setState(() => rubricId = value),
+            OutlinedButton.icon(
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RubricEditorView()),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Yeni rubrik oluştur'),
             ),
-          ),
-          OutlinedButton.icon(
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RubricEditorView()),
-              );
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Yeni rubrik oluştur'),
-          ),
-        ],
+          ],
+        ),
       );
 
   Widget _details() => Column(

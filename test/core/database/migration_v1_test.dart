@@ -18,9 +18,9 @@ void main() {
     raw.execute("INSERT INTO students VALUES (1, '101', 'Sentetik Öğrenci', '10/Test', 0, 1700000000)");
     raw.execute("INSERT INTO rubrics VALUES (1, 'Sentetik Rubrik', NULL, 1700000000, 1700000000)");
     raw.execute("INSERT INTO rubric_criteria VALUES (1, 1, 'İçerik', NULL, 20, 0)");
-    raw.execute("INSERT INTO evaluation_entries VALUES (1, 1, 1, 17, NULL, 1700000000)");
+    raw.execute('INSERT INTO evaluation_entries VALUES (1, 1, 1, 17, NULL, 1700000000)');
     raw.execute('PRAGMA user_version = 1');
-    raw.dispose();
+    raw.close();
 
     final db = AppDatabase.forTesting(NativeDatabase(file));
     expect((await db.studentDao.studentsForClassroom(1)).single.fullName, 'Sentetik Öğrenci');
