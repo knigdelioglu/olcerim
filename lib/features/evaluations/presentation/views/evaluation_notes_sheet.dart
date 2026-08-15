@@ -45,16 +45,15 @@ Future<void> showCriterionNoteDialog({
   } catch (_) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kriter notu kaydedilemedi. Önce bu kriter için puan verin.')),
+        const SnackBar(
+          content: Text('Kriter notu kaydedilemedi. Önce bu kriter için puan verin.'),
+        ),
       );
     }
   }
 }
 
-Future<void> showObservationNotesSheet(
-  BuildContext context,
-  int evaluationId,
-) {
+Future<void> showObservationNotesSheet(BuildContext context, int evaluationId) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -132,9 +131,10 @@ class _ObservationNotesSheetState extends ConsumerState<_ObservationNotesSheet> 
                             final note = items[index];
                             return ListTile(
                               leading: const Icon(Icons.notes),
-                              title: Text(note.text),
+                              title: Text(note.content),
                               subtitle: Text(
-                                DateFormat('d MMM y, HH:mm', 'tr').format(note.createdAt.toLocal()),
+                                DateFormat('d MMM y, HH:mm', 'tr')
+                                    .format(note.createdAt.toLocal()),
                               ),
                             );
                           },
@@ -154,7 +154,10 @@ class _ObservationNotesSheetState extends ConsumerState<_ObservationNotesSheet> 
     if (controller.text.trim().isEmpty) return;
     setState(() => saving = true);
     try {
-      await ref.read(evaluationRepositoryProvider).addObservation(widget.evaluationId, controller.text);
+      await ref.read(evaluationRepositoryProvider).addObservation(
+            widget.evaluationId,
+            controller.text,
+          );
       controller.clear();
     } catch (_) {
       if (mounted) {

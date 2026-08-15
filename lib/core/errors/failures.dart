@@ -13,29 +13,29 @@ final class ValidationFailure extends Failure {
 }
 
 final class StorageFailure extends Failure {
-  const StorageFailure(
-    [super.userMessage = 'Veriler kaydedilirken bir sorun oluştu.'], {
-    super.cause,
-  });
+  const StorageFailure([
+    String userMessage = 'Veriler kaydedilirken bir sorun oluştu.',
+    Object? cause,
+  ]) : super(userMessage, cause: cause);
 }
 
 final class ImportFailure extends Failure {
-  const ImportFailure(
-    [super.userMessage = 'Dosya içe aktarılırken bir sorun oluştu.'], {
-    super.cause,
-  });
+  const ImportFailure([
+    String userMessage = 'Dosya içe aktarılırken bir sorun oluştu.',
+    Object? cause,
+  ]) : super(userMessage, cause: cause);
 }
 
 final class ExportFailure extends Failure {
-  const ExportFailure(
-    [super.userMessage = 'Dosya oluşturulurken bir sorun oluştu.'], {
-    super.cause,
-  });
+  const ExportFailure([
+    String userMessage = 'Dosya oluşturulurken bir sorun oluştu.',
+    Object? cause,
+  ]) : super(userMessage, cause: cause);
 }
 
 final class BackupFailure extends Failure {
-  const BackupFailure(
-    [super.userMessage = 'Yedekleme işlemi tamamlanamadı.'], {
-    super.cause,
-  });
+  const BackupFailure([
+    String userMessage = 'Yedekleme işlemi tamamlanamadı.',
+    Object? cause,
+  ]) : super(userMessage, cause: cause);
 }

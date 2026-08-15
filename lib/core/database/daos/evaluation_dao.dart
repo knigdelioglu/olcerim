@@ -132,7 +132,7 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
     final normalized = text.trim();
     if (normalized.isEmpty) throw ArgumentError('Gözlem notu boş olamaz.');
     return into(observationNotes).insert(
-      ObservationNotesCompanion.insert(evaluationId: evaluationId, text: normalized),
+      ObservationNotesCompanion.insert(evaluationId: evaluationId, content: normalized),
     );
   }
 
@@ -183,7 +183,9 @@ class EvaluationDao extends DatabaseAccessor<AppDatabase> with _$EvaluationDaoMi
     }
     final criterionResults = criteria.map((criterion) {
       final scores = criterionScores[criterion.id]!;
-      final average = scores.isEmpty ? 0.0 : scores.fold<double>(0, (sum, score) => sum + score) / scores.length;
+      final average = scores.isEmpty
+          ? 0.0
+          : scores.fold<double>(0, (sum, score) => sum + score) / scores.length;
       return CriterionResult(
         criterionId: criterion.id,
         title: criterion.title,

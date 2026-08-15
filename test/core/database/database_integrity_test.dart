@@ -189,6 +189,6 @@ void main() {
     );
     final notes = await db.evaluationDao.watchObservations(fixture.evaluationId).first;
     expect(notes, hasLength(1));
-    expect(notes.single.text, 'Sunuma göz temasıyla başladı.');
+    expect(notes.single.content, 'Sunuma göz temasıyla başladı.');
   });
 }
