@@ -25,7 +25,7 @@ void main() {
     final tabular = TabularExportService();
 
     final csvBytes = tabular.csvBytes(results);
-    final csvRows = const Csv().decode(utf8.decode(csvBytes)).map(
+    final csvRows = csv.decode(utf8.decode(csvBytes)).map(
           (row) => row.map((cell) => '$cell').toList(),
         ).toList();
 
@@ -108,7 +108,7 @@ void main() {
     expect(results.students, isEmpty);
 
     final tabular = TabularExportService();
-    final csvRows = const Csv().decode(utf8.decode(tabular.csvBytes(results)));
+    final csvRows = csv.decode(utf8.decode(tabular.csvBytes(results)));
     expect(csvRows, hasLength(1));
 
     final xlsxPreview = await ExcelService().parseStudentList(tabular.xlsxBytes(results), 'xlsx');
