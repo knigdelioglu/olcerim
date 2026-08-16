@@ -13,6 +13,8 @@ Repo artık mimari iskelet değil çalışan 1.0 ürün adayıdır. Güncel uygu
 - Rubrik editörü, performans seviyeleri ve şablon tekrar kullanımı
 - Telefon için ardışık öğrenci puanlama, tablet/macOS için gradebook
 - Geniş ekran gradebook'ta klavye focus navigasyonu ve puanlama kısayolları
+- Sistem text scaling ile büyüyen gradebook satır/header geometrisi
+- Material kontrollerinde en az 48 dp etkileşim hedefi için tema invariantları
 - Otomatik kayıt, kriter notu, öğrenci notu ve zaman damgalı gözlem
 - Sınıf/öğrenci sonuç ekranları
 - PDF, XLSX ve CSV export; yazdırma ve sistem paylaşımı
@@ -21,13 +23,14 @@ Repo artık mimari iskelet değil çalışan 1.0 ürün adayıdır. Güncel uygu
 - Onboarding, light/dark/system tema, demo veri ve hazır rubrik şablonları
 - GitHub Actions kalite kapısı: analyze + test + Android/iOS/macOS release buildleri
 
-Gerçek öğretmen beta testi, store signing/TestFlight/Play dağıtımı ve final store assetleri henüz dış süreç olarak tamamlanmalıdır. Güncel durum için [`docs/ROADMAP.md`](docs/ROADMAP.md) esas alınır.
+Gerçek öğretmen beta testi, VoiceOver/TalkBack gerçek cihaz doğrulaması, store signing/TestFlight/Play dağıtımı ve final store assetleri henüz dış süreç olarak tamamlanmalıdır. Güncel durum için [`docs/ROADMAP.md`](docs/ROADMAP.md) esas alınır.
 
 ## Ürün referans belgeleri
 
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — fazların güncel durumu, kalan işler ve release sırası
 - [`docs/PRODUCT_SCOPE.md`](docs/PRODUCT_SCOPE.md) — 1.0 kapsamı, mimari invariant'lar ve Definition of Done
 - [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md) — tasarım sistemi ve responsive UX kuralları
+- [`docs/ACCESSIBILITY_CHECKLIST.md`](docs/ACCESSIBILITY_CHECKLIST.md) — otomatik erişilebilirlik kapıları ve gerçek cihaz acceptance matrisi
 - [`docs/BETA_TEST_PLAN.md`](docs/BETA_TEST_PLAN.md) — gerçek öğretmen beta protokolü
 - [`docs/STORE_RELEASE.md`](docs/STORE_RELEASE.md) — signing ve store release kontratı
 
@@ -157,6 +160,22 @@ Geniş ekran gradebook klavye kontrolleri:
 
 Klavye ile açılan puanlama, fare/touch ile aynı `evaluationRepositoryProvider.score()` canonical write path'ini kullanır.
 
+## Erişilebilirlik ve büyük yazı
+
+Otomatik regression kapsamı ile gerçek cihaz doğrulaması ayrı tutulur.
+
+Kod/test invariantları:
+
+- Material tap target davranışı `padded` tutulur.
+- `IconButton` ve `TextButton` minimum hedefi 48 × 48 dp'dir.
+- Filled/Outlined ana aksiyonlar en az 48 dp yüksekliğindedir.
+- Gradebook header ve öğrenci/puan satırları sistem `TextScaler` değerine göre büyür.
+- Frozen öğrenci sütunu ile score grid aynı dinamik satır yüksekliğini kullanır.
+- Score hücresinin minimum etkileşim yüksekliği 48 dp'dir.
+- Gradebook kriter notu butonu lokal `VisualDensity.compact` ile küçültülmez.
+
+VoiceOver/TalkBack ve gerçek cihaz büyük-font matrisi CI tarafından PASS sayılamaz. Bunlar [`docs/ACCESSIBILITY_CHECKLIST.md`](docs/ACCESSIBILITY_CHECKLIST.md) üzerinden gerçek cihazda ayrıca doğrulanmalıdır.
+
 ## Backup / restore
 
 Backup implementasyonu gerçektir; placeholder değildir.
@@ -238,6 +257,9 @@ Ek regression testleri:
 - aktif/arşivlenmiş student import conflict preflight
 - stale preview conflictinde transaction rollback
 - gradebook keyboard key mapping, repeat ve grid-boundary davranışı
+- text-scale-aware gradebook geometry
+- tema minimum 48 dp interaction targets
+- 2× sistem yazısında ana buton layout smoke testi
 
 ## Platform runnerları ve yerel çalıştırma
 
@@ -278,7 +300,7 @@ bootstrap platform runners
 → macOS release
 ```
 
-Bu kapının yeşil olması gerçek store signing veya gerçek öğretmen beta PASS yerine geçmez.
+Bu kapının yeşil olması gerçek store signing, VoiceOver/TalkBack gerçek cihaz doğrulaması veya gerçek öğretmen beta PASS yerine geçmez.
 
 ## Gizlilik ve repo hijyeni
 
@@ -288,7 +310,7 @@ Gerçek öğrenci adı, okul numarası, değerlendirme notu, SQLite dosyası, ba
 
 Güncel sıra `docs/ROADMAP.md` ile yönetilir. Kısa özet:
 
-1. Accessibility/font scaling audit + widget regression
+1. VoiceOver/TalkBack + gerçek cihaz font-scaling acceptance matrisi
 2. Gerçek öğretmen beta
 3. Beta P0/P1 düzeltmeleri
 4. Final app icon + gerçek store screenshotları
