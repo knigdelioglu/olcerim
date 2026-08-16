@@ -18,10 +18,14 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
   final service = ExcelService();
   StudentFilePreview? preview;
   StudentPreviewValidation? validation;
+  List<StudentImportConflict> databaseConflicts = const [];
   int? nameColumn;
   int? numberColumn;
   String? fileName;
+  String? preflightError;
   bool busy = false;
+  bool checkingConflicts = false;
+  int validationRevision = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -71,26 +75,40 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
                   _previewTable(data),
                   if (validation case final result?) ...[
                     const SizedBox(height: 16),
-                    if (result.errors.isNotEmpty)
+                    if (result.errors.isNotEmpty) _localErrorCard(result),
+                    if (checkingConflicts) ...[
+                      const SizedBox(height: 16),
+                      const Card(
+                        child: ListTile(
+                          leading: SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          title: Text('Sınıftaki mevcut okul numaraları kontrol ediliyor…'),
+                        ),
+                      ),
+                    ],
+                    if (preflightError case final message?) ...[
+                      const SizedBox(height: 16),
                       Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${result.errors.length} satırda sorun bulundu',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              ...result.errors.take(8).map(Text.new),
-                            ],
+                        child: ListTile(
+                          leading: const Icon(Icons.error_outline),
+                          title: const Text('Mevcut sınıf kontrol edilemedi'),
+                          subtitle: Text(message),
+                          trailing: TextButton(
+                            onPressed: checkingConflicts ? null : _validate,
+                            child: const Text('Tekrar dene'),
                           ),
                         ),
                       ),
+                    ],
+                    if (databaseConflicts.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _databaseConflictCard(),
+                    ],
                     const SizedBox(height: 16),
                     FilledButton(
-                      onPressed: result.isValid && !busy ? _import : null,
+                      onPressed: _canImport(result) ? _import : null,
                       child: Text('${result.validRows.length} öğrenciyi içe aktar'),
                     ),
                   ],
@@ -125,10 +143,8 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
             decoration: const InputDecoration(labelText: 'Ad soyad kolonu'),
             items: items(),
             onChanged: (value) {
-              setState(() {
-                nameColumn = value;
-                _validate();
-              });
+              setState(() => nameColumn = value);
+              _validate();
             },
           ),
         ),
@@ -147,10 +163,8 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
               ),
             ],
             onChanged: (value) {
-              setState(() {
-                numberColumn = value;
-                _validate();
-              });
+              setState(() => numberColumn = value);
+              _validate();
             },
           ),
         ),
@@ -180,6 +194,69 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
     );
   }
 
+  Widget _localErrorCard(StudentPreviewValidation result) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${result.errors.length} satırda dosya sorunu bulundu',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            ...result.errors.take(8).map(Text.new),
+            if (result.errors.length > 8)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('${result.errors.length - 8} sorun daha var.'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _databaseConflictCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${databaseConflicts.length} öğrenci mevcut sınıfla çakışıyor',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Bu kayıtlar sessizce değiştirilmez. Okul numarasını dosyada '
+              'düzeltin veya mevcut/arşivlenmiş öğrenci kaydını yönetin.',
+            ),
+            const SizedBox(height: 8),
+            ...databaseConflicts.take(8).map(
+                  (conflict) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(conflict.userMessage),
+                  ),
+                ),
+            if (databaseConflicts.length > 8)
+              Text('${databaseConflicts.length - 8} çakışma daha var.'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _canImport(StudentPreviewValidation result) {
+    return result.isValid &&
+        databaseConflicts.isEmpty &&
+        preflightError == null &&
+        !checkingConflicts &&
+        !busy;
+  }
+
   Future<void> _pickFile() async {
     final file = await FilePicker.pickFile(
       type: FileType.custom,
@@ -188,9 +265,15 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
     if (file == null) return;
 
     final bytes = await file.readAsBytes();
+    validationRevision++;
     setState(() {
       busy = true;
       fileName = file.name;
+      preview = null;
+      validation = null;
+      databaseConflicts = const [];
+      preflightError = null;
+      checkingConflicts = false;
     });
 
     try {
@@ -201,8 +284,8 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
         nameColumn = parsed.suggestedNameColumn;
         numberColumn = parsed.suggestedNumberColumn;
         busy = false;
-        _validate();
       });
+      await _validate();
     } catch (_) {
       if (mounted) {
         setState(() => busy = false);
@@ -217,49 +300,109 @@ class _StudentImportViewState extends ConsumerState<StudentImportView> {
     }
   }
 
-  void _validate() {
+  Future<void> _validate() async {
+    final revision = ++validationRevision;
     final data = preview;
     final name = nameColumn;
     if (data == null || name == null) {
-      validation = null;
+      if (mounted) {
+        setState(() {
+          validation = null;
+          databaseConflicts = const [];
+          preflightError = null;
+          checkingConflicts = false;
+        });
+      }
       return;
     }
-    validation = service.validate(
+
+    final localResult = service.validate(
       data,
       nameColumn: name,
       numberColumn: numberColumn,
     );
+    if (!mounted || revision != validationRevision) return;
+
+    final records = _importRecords(localResult);
+    final needsDatabaseCheck = localResult.isValid &&
+        records.any((record) => record.schoolNumber?.isNotEmpty == true);
+    setState(() {
+      validation = localResult;
+      databaseConflicts = const [];
+      preflightError = null;
+      checkingConflicts = needsDatabaseCheck;
+    });
+
+    if (!needsDatabaseCheck) return;
+
+    try {
+      final conflicts = await ref
+          .read(studentRepositoryProvider)
+          .findImportConflicts(widget.classroomId!, records);
+      if (!mounted || revision != validationRevision) return;
+      setState(() {
+        databaseConflicts = conflicts;
+        checkingConflicts = false;
+      });
+    } catch (_) {
+      if (!mounted || revision != validationRevision) return;
+      setState(() {
+        checkingConflicts = false;
+        preflightError =
+            'İçe aktarmadan önce sınıftaki okul numaraları doğrulanamadı. '
+            'Bağlantıyı değil yerel veritabanını kontrol eden bu adım '
+            'başarılı olmadan içe aktarma yapılmayacak.';
+      });
+    }
+  }
+
+  List<StudentImportRecord> _importRecords(StudentPreviewValidation result) {
+    return result.validRows
+        .map(
+          (row) => StudentImportRecord(
+            fullName: row.fullName,
+            schoolNumber: row.schoolNumber,
+            sourceRow: row.sourceRow,
+          ),
+        )
+        .toList();
   }
 
   Future<void> _import() async {
     final result = validation;
-    if (result == null || !result.isValid) return;
+    if (result == null || !_canImport(result)) return;
 
     setState(() => busy = true);
     try {
       await ref.read(studentRepositoryProvider).importStudents(
             widget.classroomId!,
-            result.validRows
-                .map(
-                  (row) => StudentImportRecord(
-                    fullName: row.fullName,
-                    schoolNumber: row.schoolNumber,
-                  ),
-                )
-                .toList(),
+            _importRecords(result),
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${result.validRows.length} öğrenci içe aktarıldı.')),
       );
       Navigator.pop(context);
+    } on StudentImportConflictException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        databaseConflicts = error.conflicts;
+        preflightError = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Sınıf listesi önizlemeden sonra değişti. Yeni çakışmaları '
+            'kontrol edip tekrar deneyin.',
+          ),
+        ),
+      );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Öğrenciler içe aktarılamadı. Aynı okul numarasını kullanan '
-              'öğrencileri kontrol edin.',
+              'Öğrenciler içe aktarılamadı. Verileri kontrol edip tekrar deneyin.',
             ),
           ),
         );
