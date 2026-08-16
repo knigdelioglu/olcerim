@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:olcerim/app/layout/app_breakpoints.dart';
+import 'package:olcerim/app/router/adaptive_app_shell.dart';
 import 'package:olcerim/features/classrooms/presentation/views/classrooms_view.dart';
 import 'package:olcerim/features/evaluations/presentation/views/assessments_view.dart';
 import 'package:olcerim/features/onboarding/presentation/controllers/onboarding_provider.dart';
@@ -74,56 +74,10 @@ class _AppRouterState extends ConsumerState<AppRouter> {
     );
   }
 
-  Widget _buildShell() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final layout = AppBreakpoints.ofWidth(constraints.maxWidth);
-        if (layout == AppLayoutClass.compact) {
-          return Scaffold(
-            body: SafeArea(
-              child: IndexedStack(index: selectedIndex, children: _pages),
-            ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (value) => setState(() => selectedIndex = value),
-              destinations: _destinations,
-            ),
-          );
-        }
-
-        final extended = layout == AppLayoutClass.expanded;
-        return Scaffold(
-          body: SafeArea(
-            child: Row(
-              children: [
-                NavigationRail(
-                  extended: extended,
-                  minExtendedWidth: 248,
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: (value) => setState(() => selectedIndex = value),
-                  leading: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Text('Ölçerim', style: Theme.of(context).textTheme.titleLarge),
-                  ),
-                  destinations: _destinations
-                      .map(
-                        (item) => NavigationRailDestination(
-                          icon: item.icon,
-                          selectedIcon: item.selectedIcon,
-                          label: Text(item.label),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(
-                  child: IndexedStack(index: selectedIndex, children: _pages),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Widget _buildShell() => AdaptiveAppShell(
+        selectedIndex: selectedIndex,
+        destinations: _destinations,
+        pages: _pages,
+        onDestinationSelected: (value) => setState(() => selectedIndex = value),
+      );
 }
