@@ -486,9 +486,9 @@ class _GradebookState extends ConsumerState<_Gradebook> {
                     message:
                         'Klavye: Tab ile puan hücresine geçin; ok tuşlarıyla hareket edin; '
                         'Home/End ile satırın başına/sonuna gidin; Enter veya Space ile puanlayın.',
-                    child: const Semantics(
+                    child: Semantics(
                       label: 'Klavye kısayolları bilgisi',
-                      child: Icon(Icons.keyboard_alt_outlined),
+                      child: const Icon(Icons.keyboard_alt_outlined),
                     ),
                   ),
                 ),
@@ -533,7 +533,11 @@ class _GradebookState extends ConsumerState<_Gradebook> {
                                 (criterion) => SizedBox(
                                   width: cellWidth,
                                   child: Center(
-                                    child: Text(criterion.title, overflow: TextOverflow.ellipsis),
+                                    child: Text(
+                                      criterion.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -593,9 +597,18 @@ class _StudentNameCell extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(row.student.fullName, overflow: TextOverflow.ellipsis),
+                    Text(
+                      row.student.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     if (row.student.schoolNumber != null)
-                      Text(row.student.schoolNumber!, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        row.student.schoolNumber!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                   ],
                 ),
               ),
