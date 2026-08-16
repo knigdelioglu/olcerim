@@ -1,32 +1,40 @@
 # Ölçerim
 
-**Ölçerim**, öğretmenlerin öğrencilerin performanslarını rubrikler ve kriter bazlı değerlendirmelerle takip etmesi için tasarlanmış, **local-first** bir Flutter uygulamasıdır. Hedef platformlar **Android, iOS ve macOS**'tur. Sunucu zorunluluğu yoktur; öğrenci ve değerlendirme verileri cihazdaki SQLite veritabanında tutulur.
+**Ölçerim**, öğretmenlerin öğrenci performansını cihaz üzerinde rubrik ve hızlı derecelendirme araçlarıyla takip etmesi için geliştirilmiş **local-first** bir Flutter uygulamasıdır. Hedef platformlar **Android, iOS/iPadOS ve macOS**'tur. Sunucu zorunluluğu yoktur; sınıf, öğrenci, değerlendirme ve ayar verileri Drift/SQLite içinde tutulur.
 
-## Temel hedef
+## Güncel ürün durumu
 
-- Öğrenci/sınıf listelerini Excel veya CSV'den içe aktarmak.
-- Öğretmenin rubrik ve kriterlerini tanımlamasını sağlamak.
-- Öğrenciyi kriter bazında hızlı biçimde puanlamak ve not almak.
-- Değerlendirme çizelgelerini PDF/Excel olarak üretmek, yazdırmak veya sistem paylaşım menüsüyle dışa aktarmak.
-- Sunucusuz kullanımda veri kaybına karşı sürümlü ve **şifreli tam yedekleme/geri yükleme** akışı sağlamak.
-- Yeni sürümlerde mevcut öğretmen verisini koruyan test edilebilir Drift migration'ları kullanmak.
+Repo artık mimari iskelet değil çalışan 1.0 ürün adayıdır. Güncel uygulama şunları içerir:
 
-## Ürün planı, kapsamı ve UX
+- Eğitim yılı, ders, sınıf ve öğrenci yönetimi
+- Manuel öğrenci CRUD + Excel/CSV import
+- Rubrik ve hızlı derecelendirme assessment tipleri
+- Rubrik editörü, performans seviyeleri ve şablon tekrar kullanımı
+- Telefon için ardışık öğrenci puanlama, tablet/macOS için gradebook
+- Otomatik kayıt, kriter notu, öğrenci notu ve zaman damgalı gözlem
+- Sınıf/öğrenci sonuç ekranları
+- PDF, XLSX ve CSV export; yazdırma ve sistem paylaşımı
+- AES-256-GCM ile şifreli tam backup/restore
+- Atomik restore ve migration test zinciri
+- Onboarding, light/dark/system tema, demo veri ve hazır rubrik şablonları
+- GitHub Actions kalite kapısı: analyze + test + Android/iOS/macOS release buildleri
 
-Ölçerim 1.0 geliştirmesinde aşağıdaki üç belge ürün referansı olarak kabul edilir:
+Gerçek öğretmen beta testi, store signing/TestFlight/Play dağıtımı ve final store assetleri henüz dış süreç olarak tamamlanmalıdır. Güncel durum için [`docs/ROADMAP.md`](docs/ROADMAP.md) esas alınır.
 
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — mevcut iskeletten pazarlanabilir Ölçerim 1.0'a kadar geliştirme fazları, çıkış kriterleri ve sıralama.
-- [`docs/PRODUCT_SCOPE.md`](docs/PRODUCT_SCOPE.md) — 1.0 kapsamı, kesin sınırlar, mimari invariant'lar, veri güvenliği ve Definition of Done.
-- [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md) — tasarım sistemi, renk/typography/spacing tokenları, responsive navigasyon, bileşen kuralları ve 1.0 ekranlarının telefon/tablet/macOS UX spesifikasyonları.
+## Ürün referans belgeleri
 
-Yeni özellikler eklenirken önce bu belgelerdeki kapsam, sıralama ve UX kuralları korunmalıdır. Özellikle veri güvenliği, migration, backup/restore ve değerlendirme doğruluğu sonraya bırakılabilecek teknik borçlar değildir.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — fazların güncel durumu, kalan işler ve release sırası
+- [`docs/PRODUCT_SCOPE.md`](docs/PRODUCT_SCOPE.md) — 1.0 kapsamı, mimari invariant'lar ve Definition of Done
+- [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md) — tasarım sistemi ve responsive UX kuralları
+- [`docs/BETA_TEST_PLAN.md`](docs/BETA_TEST_PLAN.md) — gerçek öğretmen beta protokolü
+- [`docs/STORE_RELEASE.md`](docs/STORE_RELEASE.md) — signing ve store release kontratı
 
 ## Mimari
 
 **Feature-First Local-First Layered Architecture** uygulanır.
 
 ```text
-UI / Presentation
+Presentation / UI
         ↓
 Riverpod controller/provider
         ↓
@@ -34,104 +42,179 @@ Feature repository
         ↓
 DAO / local service
         ↓
-Drift + SQLite / Files / PDF / Excel
+Drift + SQLite / File system / PDF / Excel
 ```
 
-Ağ katmanı varsayılan mimarinin parçası değildir. Özellikler (`students`, `rubrics`, `evaluations`, `reports`, `backup`) kendi veri ve sunum sorumluluklarını izole eder.
+Ağ katmanı temel ürün için zorunlu değildir. Aynı domain verisi için alternatif write path açılmamalı; veri invariant'ları repository/DAO katmanında korunmalıdır.
 
 ## Teknoloji yığını
 
 - Flutter + Material 3
 - Riverpod
-- Drift + SQLite
+- Drift + SQLite (`sqlite3` 3.x)
 - file_picker + share_plus + path_provider
 - excel + csv
 - pdf + printing
+- cryptography + cryptography_flutter
 - Freezed + json_serializable
 
-> Not: Eski mimari notlarında geçen `sqlite3_flutter_libs` artık kullanılmamalıdır. Güncel Drift native kurulumu `sqlite3` 3.x ile Android/iOS/macOS'ta ek native SQLite paketi olmadan çalışır.
-
-## Veri modeli — ilk şema
+## Veri modeli — schema v6
 
 ```text
-Students
-  └── id, schoolNumber, fullName, className, archived
+SchoolYear
+  └── Course
+       └── Classroom
+            └── Student
 
-Rubrics
-  └── id, title, description
-       └── RubricCriteria
-             └── id, rubricId, title, description, maxScore, sortOrder
+Rubric (template veya assessment snapshot)
+  └── RubricCriterion
+       └── RubricLevel
 
-EvaluationEntries
-  └── id, studentId, criterionId, score, note, evaluatedAt
+Assessment
+  └── Evaluation (assessment + student)
+       ├── EvaluationEntry (criterion score + criterion note)
+       └── ObservationNote
+
+AppSetting
 ```
 
-`EvaluationEntries(studentId, criterionId)` benzersizdir. Foreign key'ler etkinleştirilir ve veritabanı WAL modunda açılır.
-
-## Kritik veri güvenliği kuralları
-
-1. Kullanıcı verisi `SharedPreferences` veya tek parça JSON içinde tutulmaz.
-2. Her şema değişikliğinde `schemaVersion` artırılır ve ileri yönlü açık migration yazılır.
-3. Production upgrade sırasında veritabanı silinip yeniden oluşturulmaz.
-4. Yedek dosyası uygulama dışına çıkmadan önce şifrelenir; format ve şema sürümü taşır.
-5. Restore işlemi doğrulama sonrası transaction içinde yapılır; yarım restore kabul edilmez.
-6. PDF/Excel/yedek dosyaları uygulama sandbox'ında kilitli bırakılmaz; Share Sheet / Android Sharesheet üzerinden kullanıcıya teslim edilir.
-7. Excel parse ve ağır dosya işlemleri UI isolate üzerinde yapılmaz.
-
-## Klasör yapısı
+Güncel fiziksel tablolar:
 
 ```text
-lib/
-├── app/
-│   ├── app.dart
-│   ├── router/app_router.dart
-│   └── theme/app_theme.dart
-├── core/
-│   ├── constants/app_constants.dart
-│   ├── database/
-│   │   ├── app_database.dart
-│   │   ├── database_provider.dart
-│   │   ├── daos/
-│   │   │   ├── evaluation_dao.dart
-│   │   │   ├── rubric_dao.dart
-│   │   │   └── student_dao.dart
-│   │   └── tables/
-│   │       ├── evaluation_entries.dart
-│   │       ├── rubric_criteria.dart
-│   │       ├── rubrics.dart
-│   │       └── students.dart
-│   ├── errors/failures.dart
-│   └── services/
-│       ├── backup_restore_service.dart
-│       ├── excel_service.dart
-│       └── pdf_export_service.dart
-├── features/
-│   ├── backup/
-│   ├── evaluations/
-│   ├── reports/
-│   ├── rubrics/
-│   └── students/
-└── main.dart
+school_years
+courses
+classrooms
+students
+rubrics
+rubric_criteria
+rubric_levels
+assessments
+evaluations
+evaluation_entries
+observation_notes
+app_settings
 ```
 
-## Excel → SQLite veri akışı
+Temel bütünlük kuralları:
 
-1. `StudentImportView` sistem dosya seçicisini açar.
-2. Dosya byte'ları `ExcelService`'e aktarılır.
-3. Parse/doğrulama işi UI isolate dışına taşınır.
-4. Sonuç `StudentRepository` üzerinden `StudentDao.insertMultipleStudents` metoduna gider.
-5. DAO tüm öğrencileri tek transaction/batch içinde yazar.
-6. Drift stream'i değişikliği yayınlar; Riverpod üzerinden öğrenci listesi reaktif yenilenir.
+- `Student` bir `Classroom`a bağlıdır.
+- Aynı sınıfta aynı okul numarası duplicate olamaz.
+- Assessment oluşturulurken kullanılan rubrik snapshot olarak kopyalanır; sonradan template değişikliği eski değerlendirmeyi bozmaz.
+- `Evaluation`, assessment + student çiftini temsil eder.
+- `EvaluationEntry`, evaluation + criterion için tek canonical puan kaydıdır.
+- Puan kriter maksimumunu aşamaz.
+- Evaluation status (`notStarted | incomplete | completed`) gerçek entry sayısından türetilen invariant olarak korunur.
+- Foreign key'ler açık, production DB WAL modundadır.
 
-## Platform runnerlarını oluşturma
+## Excel / CSV → SQLite akışı
 
-Bu repo iskeletinin üretildiği ortamda Flutter CLI bulunmadığı için Android/iOS/macOS runner dosyaları elle kopyalanmamıştır. Flutter'ın kendi güncel şablonundan üretmek için proje kökünde:
+```text
+Dosya seç
+→ byte'ları al
+→ UI isolate dışında parse et
+→ kolonları algıla
+→ önizle + doğrula
+→ tek transaction/batch ile yaz
+→ Drift stream üzerinden UI'ı yenile
+```
+
+Dosya içindeki duplicate okul numaraları ve boş öğrenci adları import başlamadan raporlanır. Mevcut sınıftaki kayıtlarla conflict preflight'i roadmap'teki sıradaki UX/data işlerinden biridir.
+
+## Değerlendirme akışı
+
+```text
+Classroom
+→ rubric template veya quick-scale preset
+→ Assessment
+→ rubric snapshot
+→ sınıftaki aktif öğrenciler için Evaluation kayıtları
+→ criterion score / note / observation autosave
+→ AssessmentResults
+→ PDF / XLSX / CSV
+```
+
+Telefon görünümü öğrenci-odaklı ardışık akış kullanır; geniş ekranda gradebook yerleşimi kullanılır.
+
+## Backup / restore
+
+Backup implementasyonu gerçektir; placeholder değildir.
+
+Şifreleme:
+
+- **AES-256-GCM** authenticated encryption
+- **PBKDF2-HMAC-SHA256**
+- **600.000 iterasyon**
+- 256-bit türetilmiş anahtar
+- random salt + nonce
+- MAC doğrulaması
+
+Envelope örneği:
+
+```json
+{
+  "format": "olcerim-backup",
+  "formatVersion": 1,
+  "cipher": "AES-256-GCM",
+  "kdf": "PBKDF2-HMAC-SHA256",
+  "iterations": 600000,
+  "salt": "base64",
+  "nonce": "base64",
+  "cipherText": "base64",
+  "mac": "base64"
+}
+```
+
+Şifreli payload içinde metadata (`createdAt`, `databaseSchemaVersion`, tablo sayımları) ve güncel kullanıcı tablolarının tamamı bulunur. Restore tüm tabloları tek Drift transaction içinde değiştirir; hata halinde eski DB korunur.
+
+Test kapısı ayrıca şunu doğrular:
+
+```text
+DB A
+→ encrypted backup
+→ clean DB B
+→ restore
+→ A.data == B.data
+```
+
+## Migration politikası
+
+Güncel şema **v6**'dır.
+
+Kurallar:
+
+1. Her veri modeli değişikliğinde `schemaVersion` artırılır.
+2. `onUpgrade` içinde ileri yönlü açık migration yazılır.
+3. Production çözümü olarak DB silinmez.
+4. Tarihsel kullanıcı DB'leri için migration regression testi eklenir.
+5. Güncel test matrisi v1/v2/v3/v4/v5 → v6 upgrade yollarını kapsar.
+6. v6 migration'ı eski sürümlerde stale kalabilen evaluation statuslarını gerçek score/criterion sayılarından yeniden hesaplar.
+
+## Kritik test zinciri
+
+CI'da unit/data testlerinin yanında kritik entegrasyon akışı da çalışır:
+
+```text
+CSV import
+→ rubrik oluştur
+→ assessment oluştur
+→ puan/not/gözlem kaydet
+→ sonuçları doğrula
+→ PDF/CSV/XLSX üret
+→ DB'yi kapat/aç
+→ encrypted backup
+→ clean DB restore
+→ sonuç ve FK bütünlüğünü tekrar doğrula
+```
+
+Export regression testleri CSV/XLSX mantıksal eşitliğini, Türkçe karakterleri, not/gözlem alanlarını, completed/incomplete durumlarını ve öğrencisiz assessment çıktısını korur.
+
+## Platform runnerları ve yerel çalıştırma
+
+Runnerlar güncel Flutter SDK şablonundan üretilebilir:
 
 ```bash
 ./tool/bootstrap_platforms.sh
 ```
-
-Bu script geçici bir Flutter projesi oluşturur ve yalnız `android/`, `ios/`, `macos/` ile `.metadata` dosyasını mevcut projeye taşır.
 
 Ardından:
 
@@ -141,46 +224,45 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run -d macos
 ```
 
-Android veya iOS cihaz/simülatörü için `flutter devices` ile hedefi görüp `flutter run -d <device-id>` kullanın.
+Diğer cihaz/simülatörler için:
 
-## Migration politikası
-
-İlk şema sürümü `1`'dir. Her veri modeli değişikliğinde:
-
-- `schemaVersion` artırılır.
-- `onUpgrade` içinde yalnız gereken migration adımları yazılır.
-- Eski şemadan yeni şemaya gerçek veriyle migration testi eklenir.
-- Yedek format sürümü ile DB şema sürümü birbirinden bağımsız tutulur.
-
-## Yedek formatı
-
-Yedek servisinin dış sözleşmesi hazırdır; gerçek kriptografik implementasyon sonraki geliştirme adımıdır. Nihai format en az şunları taşımalıdır:
-
-```json
-{
-  "format": "olcerim-backup",
-  "formatVersion": 1,
-  "createdAt": "ISO-8601",
-  "databaseSchemaVersion": 1,
-  "cipher": "...",
-  "kdf": "...",
-  "payload": "encrypted-bytes"
-}
+```bash
+flutter devices
+flutter run -d <device-id>
 ```
 
-Şifreleme algoritması uygulama içinde özel tasarlanmamalı; bakımlı bir kriptografi kütüphanesinin AEAD primitive'i ve parola tabanlı güvenli KDF kullanılmalıdır.
+## CI kalite kapısı
 
-## İlk geliştirme sırası
+`.github/workflows/phase14-quality-gate.yml` hem `main` pushlarında hem `main` hedefli pull requestlerde çalışır:
 
-1. Platform runnerlarını üret.
-2. Drift code generation'ı çalıştır.
-3. Öğrenci import pipeline'ını tamamla.
-4. Rubrik CRUD + kriter CRUD'ı tamamla.
-5. Değerlendirme tablosunu Drift stream + Riverpod ile bağla.
-6. PDF/Excel export ve Share Sheet akışını tamamla.
-7. Şifreli backup/restore formatını ve atomik restore'u uygula.
-8. Migration test kapısını zorunlu hale getir.
+```text
+bootstrap platform runners
+→ flutter pub get
+→ build_runner
+→ flutter analyze
+→ flutter test
+→ Android APK
+→ Android AAB
+→ unsigned iOS release
+→ macOS release
+```
 
-## Gizlilik
+Bu kapının yeşil olması gerçek store signing veya gerçek öğretmen beta PASS yerine geçmez.
 
-Repo private tutulmalıdır. Gerçek öğrenci adı, okul numarası, değerlendirme notu, SQLite dosyası, yedek ve export dosyaları repoya commit edilmemelidir; `.gitignore` bu veri türlerini dışlar.
+## Gizlilik ve repo hijyeni
+
+Gerçek öğrenci adı, okul numarası, değerlendirme notu, SQLite dosyası, backup ve export dosyaları repoya commit edilmemelidir. Testlerde yalnız sentetik/anonim fixture kullanılmalıdır.
+
+## Sıradaki işler
+
+Güncel sıra `docs/ROADMAP.md` ile yönetilir. Kısa özet:
+
+1. Export regression coverage'ı koru ve genişlet
+2. Existing-duplicate import preflight
+3. macOS/tablet keyboard grading polish
+4. Accessibility/font scaling audit
+5. Gerçek öğretmen beta
+6. Beta P0/P1 düzeltmeleri
+7. Final app icon + gerçek store screenshotları
+8. Apple/Google signing ve internal testing
+9. Beta sonrası ticari/IAP kararı
