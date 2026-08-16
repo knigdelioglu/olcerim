@@ -133,8 +133,8 @@ void main() {
       final pdf = await reportRepository.classPdf(beforeRestart);
       final csv = reportRepository.csv(beforeRestart);
       final xlsx = reportRepository.xlsx(beforeRestart);
-      expect(pdf.length, greaterThan(500));
-      expect(xlsx.length, greaterThan(500));
+      expect(pdf.take(4).toList(), utf8.encode('%PDF'));
+      expect(xlsx.take(4).toList(), [0x50, 0x4b, 0x03, 0x04]);
       expect(utf8.decode(csv), contains('Ada Test'));
       expect(utf8.decode(csv), contains('Bora Test'));
 
