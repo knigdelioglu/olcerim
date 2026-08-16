@@ -12,6 +12,7 @@ Repo artık mimari iskelet değil çalışan 1.0 ürün adayıdır. Güncel uygu
 - Rubrik ve hızlı derecelendirme assessment tipleri
 - Rubrik editörü, performans seviyeleri ve şablon tekrar kullanımı
 - Telefon için ardışık öğrenci puanlama, tablet/macOS için gradebook
+- Geniş ekran gradebook'ta klavye focus navigasyonu ve puanlama kısayolları
 - Otomatik kayıt, kriter notu, öğrenci notu ve zaman damgalı gözlem
 - Sınıf/öğrenci sonuç ekranları
 - PDF, XLSX ve CSV export; yazdırma ve sistem paylaşımı
@@ -146,6 +147,16 @@ Classroom
 
 Telefon görünümü öğrenci-odaklı ardışık akış kullanır; geniş ekranda gradebook yerleşimi kullanılır.
 
+Geniş ekran gradebook klavye kontrolleri:
+
+- `Tab` — puan hücrelerine focus ile gir
+- `←` / `→` — kriterler arasında hareket et
+- `↑` / `↓` — öğrenciler arasında hareket et
+- `Home` / `End` — mevcut öğrencinin ilk/son kriterine git
+- `Enter`, numpad `Enter` veya `Space` — mevcut puan hücresini aç
+
+Klavye ile açılan puanlama, fare/touch ile aynı `evaluationRepositoryProvider.score()` canonical write path'ini kullanır.
+
 ## Backup / restore
 
 Backup implementasyonu gerçektir; placeholder değildir.
@@ -226,6 +237,7 @@ Ek regression testleri:
 - öğrencisiz assessment exportu
 - aktif/arşivlenmiş student import conflict preflight
 - stale preview conflictinde transaction rollback
+- gradebook keyboard key mapping, repeat ve grid-boundary davranışı
 
 ## Platform runnerları ve yerel çalıştırma
 
@@ -276,10 +288,9 @@ Gerçek öğrenci adı, okul numarası, değerlendirme notu, SQLite dosyası, ba
 
 Güncel sıra `docs/ROADMAP.md` ile yönetilir. Kısa özet:
 
-1. macOS/tablet keyboard grading polish
-2. Accessibility/font scaling audit
-3. Gerçek öğretmen beta
-4. Beta P0/P1 düzeltmeleri
-5. Final app icon + gerçek store screenshotları
-6. Apple/Google signing ve internal testing
-7. Beta sonrası ticari/IAP kararı
+1. Accessibility/font scaling audit + widget regression
+2. Gerçek öğretmen beta
+3. Beta P0/P1 düzeltmeleri
+4. Final app icon + gerçek store screenshotları
+5. Apple/Google signing ve internal testing
+6. Beta sonrası ticari/IAP kararı
