@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -63,6 +63,7 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(rubrics, rubrics.archived);
           }
           if (from < 5) await migrator.createTable(appSettings);
+          if (from < 6) await _repairEvaluationStatuses();
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
@@ -168,6 +169,8 @@ class AppDatabase extends _$AppDatabase {
         final item = AppSetting.fromJson(row);
         await into(appSettings).insert(item.toCompanion(true));
       }
+
+      await _repairEvaluationStatuses();
     });
   }
 
@@ -232,6 +235,36 @@ class AppDatabase extends _$AppDatabase {
     await customStatement('DROP TABLE evaluation_entries');
     await customStatement('ALTER TABLE evaluation_entries_v3 RENAME TO evaluation_entries');
     await customStatement('PRAGMA foreign_keys = ON');
+  }
+
+  Future<void> _repairEvaluationStatuses() async {
+    await customStatement('''
+      UPDATE evaluations
+      SET status = CASE
+        WHEN (
+          SELECT COUNT(*)
+          FROM evaluation_entries ee
+          WHERE ee.evaluation_id = evaluations.id
+        ) = 0 THEN 'notStarted'
+        WHEN (
+          SELECT COUNT(*)
+          FROM rubric_criteria rc
+          JOIN assessments a ON a.rubric_id = rc.rubric_id
+          WHERE a.id = evaluations.assessment_id
+        ) > 0
+        AND (
+          SELECT COUNT(*)
+          FROM evaluation_entries ee
+          WHERE ee.evaluation_id = evaluations.id
+        ) >= (
+          SELECT COUNT(*)
+          FROM rubric_criteria rc
+          JOIN assessments a ON a.rubric_id = rc.rubric_id
+          WHERE a.id = evaluations.assessment_id
+        ) THEN 'completed'
+        ELSE 'incomplete'
+      END
+    ''');
   }
 
   Future<void> _seedInitialSchoolYear() async {
