@@ -17,7 +17,7 @@ Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerin
 | 0 — Teknik temel | **DONE** | — |
 | 1 — Sınıf/öğrenci | **PARTIAL** | eğitim yılı edit/archive polish |
 | 2 — Assessment domain | **DONE** | — |
-| 3 — Hızlı değerlendirme | **PARTIAL** | klavye navigasyonu/shortcut; isteğe bağlı toplu puanlama |
+| 3 — Hızlı değerlendirme | **DONE** | toplu puanlama yalnız beta ihtiyacı doğrulanırsa opsiyonel |
 | 4 — Rubrik oluşturucu | **DONE** | — |
 | 5 — Sonuç/analiz | **DONE** | — |
 | 6 — PDF/Excel/Print | **DONE** | export regression coverage sürekli korunmalı |
@@ -99,7 +99,7 @@ Assessment oluşturulurken rubrik snapshot'ı alınır; evaluation kayıtları s
 
 ## Faz 3 — Hızlı değerlendirme ekranı
 
-**Durum: PARTIAL**
+**Durum: DONE**
 
 ### Tamamlanan
 - Telefon için tek öğrenci odaklı akış
@@ -109,13 +109,19 @@ Assessment oluşturulurken rubrik snapshot'ı alınır; evaluation kayıtları s
 - notStarted/incomplete/completed durumları
 - Değerlendirilmeyen/eksik filtreleri
 - Kriter notu, öğrenci notu ve zaman damgalı gözlem
+- Geniş ekran gradebook score hücreleri için gerçek focus hedefleri
+- `←/→` ile kriterler, `↑/↓` ile öğrenciler arasında klavye navigasyonu
+- `Home/End` ile mevcut öğrencinin ilk/son kriterine hareket
+- `Enter`, numpad `Enter` ve `Space` ile mevcut score picker'ı açma
+- Focus edilen hücreyi görünür alana kaydırma ve görsel focus ring
+- Klavye ile puanlamada mevcut canonical `score()` write path'ini koruma
+- Keyboard command ve grid-boundary regression testleri
 
-### Kalan
-- macOS/tablet için gerçek klavye focus navigasyonu ve shortcutlar
-- Kullanıcı testinde ihtiyaç doğrulanırsa toplu puanlama
+### Beta sonrası opsiyonel
+- Gerçek kullanıcı testinde ihtiyaç doğrulanırsa toplu puanlama
 
 ### Çıkış kriteri
-30 öğrencilik sınıf veri kaybı veya manuel Kaydet ihtiyacı olmadan akıcı değerlendirilmeli; desktop kullanıcısı yalnız fareye bağımlı bırakılmamalıdır.
+30 öğrencilik sınıf veri kaybı veya manuel Kaydet ihtiyacı olmadan akıcı değerlendirilebilmeli; desktop kullanıcısı yalnız fareye bağımlı kalmamalıdır. Klavye puanlaması fare/touch ile aynı domain write path'ini kullanmalıdır.
 
 ---
 
@@ -210,6 +216,7 @@ Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı
 - Kullanıcı dostu hata yüzeyleri
 - Archive/Undo yaklaşımı
 - Temel semantic label kullanımı
+- Geniş ekran gradebook keyboard focus/shortcut desteği
 
 ### Kalan
 - VoiceOver/TalkBack gerçek cihaz doğrulaması
@@ -232,6 +239,7 @@ Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı
 - Full encrypted backup/restore round-trip testi
 - Failed restore atomic rollback testi
 - PDF/CSV/XLSX regression testleri
+- Gradebook keyboard command/grid-boundary regression testleri
 - Kritik entegrasyon zinciri:
 
 ```text
@@ -340,21 +348,19 @@ Tercih edilen yön: local-first premium uygulama. Fiyat ve paket sınırları ge
 # Güncel çalışma sırası
 
 ```text
-1. Desktop keyboard grading polish
+1. Accessibility + font scaling audit/test
 ↓
-2. Accessibility + font scaling audit/test
+2. Gerçek öğretmen beta
 ↓
-3. Gerçek öğretmen beta
+3. Beta P0/P1 düzeltmeleri
 ↓
-4. Beta P0/P1 düzeltmeleri
+4. Final icon + screenshot assetleri
 ↓
-5. Final icon + screenshot assetleri
+5. Signing / TestFlight / Play internal testing
 ↓
-6. Signing / TestFlight / Play internal testing
+6. Ticari model ve IAP kararı
 ↓
-7. Ticari model ve IAP kararı
-↓
-8. Ölçerim 1.0 RC
+7. Ölçerim 1.0 RC
 ```
 
 ## Yol haritası kuralı
