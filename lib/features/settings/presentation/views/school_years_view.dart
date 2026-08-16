@@ -287,7 +287,7 @@ class SchoolYearsView extends ConsumerWidget {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: endsAt,
-                      firstDate: DateTime(startsAt.year),
+                      firstDate: DateTime(endsAt.year - 5),
                       lastDate: DateTime(endsAt.year + 5, 12, 31),
                     );
                     if (picked != null) setLocalState(() => endsAt = picked);
