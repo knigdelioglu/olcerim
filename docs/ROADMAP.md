@@ -15,7 +15,7 @@ Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerin
 | Faz | Durum | Kalan ana iş |
 |---|---|---|
 | 0 — Teknik temel | **DONE** | — |
-| 1 — Sınıf/öğrenci | **PARTIAL** | mevcut sınıftaki duplicate import preflight; eğitim yılı edit/archive polish |
+| 1 — Sınıf/öğrenci | **PARTIAL** | eğitim yılı edit/archive polish |
 | 2 — Assessment domain | **DONE** | — |
 | 3 — Hızlı değerlendirme | **PARTIAL** | klavye navigasyonu/shortcut; isteğe bağlı toplu puanlama |
 | 4 — Rubrik oluşturucu | **DONE** | — |
@@ -58,15 +58,17 @@ Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerin
 - Excel/CSV import
 - Kolon algılama, önizleme ve satır doğrulama
 - Dosya içi duplicate tespiti
-- Transaction/batch ile toplu yazma
+- Mevcut sınıftaki okul numarası conflict'lerini import öncesinde satır bazında gösterme
+- Aktif ve arşivlenmiş öğrencileri aynı uniqueness invariantı içinde kontrol etme
+- Önizleme sonrası yarış durumuna karşı write transaction içinde conflict'i yeniden doğrulama
+- Conflict olduğunda sessiz overwrite yerine güvenli bloklama
+- Transaction/batch ile toplu yazma ve conflict halinde sıfır partial insert
 
 ### Kalan
-- Import önizlemesinde mevcut sınıf DB'siyle okul numarası çakışmalarını satır bazında göstermek
-- Gerekirse skip/update/cancel politikası tanımlamak
 - Eğitim yılı düzenleme/arşivleme UX'ini tamamlamak
 
 ### Çıkış kriteri
-30–40 öğrencilik gerçek sınıf birkaç dakika içinde güvenli biçimde oluşturulabilmeli; conflict sonucu kullanıcıya import başlamadan önce açıkça gösterilmelidir.
+30–40 öğrencilik gerçek sınıf birkaç dakika içinde güvenli biçimde oluşturulabilmeli; conflict sonucu kullanıcıya import başlamadan önce açıkça gösterilmeli ve stale preview durumunda write path aynı invariantı yeniden doğrulamalıdır.
 
 ---
 
@@ -157,7 +159,7 @@ Assessment oluşturulurken rubrik snapshot'ı alınır; evaluation kayıtları s
 5. Sistem yazdırma/paylaşma akışları
 
 ### Kalite kapısı
-Export regression testleri şu invariants'ı korumalıdır:
+Export regression testleri şu invariants'ı korur:
 - öğrenci/kriter eşleşmesi
 - toplam ve durum alanları
 - kriter/öğretmen/gözlem notları
@@ -165,6 +167,7 @@ Export regression testleri şu invariants'ı korumalıdır:
 - eksik değerlendirme
 - öğrencisiz değerlendirme
 - CSV ve XLSX mantıksal içerik eşitliği
+- sınıf ve öğrenci PDF'lerinin geçerli PDF üretmesi
 
 ---
 
@@ -223,10 +226,12 @@ Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı
 ### Mevcut kapsam
 - Domain invariant testleri
 - FK/transaction/rollback testleri
-- Import testleri
+- Import parse/validation ve existing-conflict preflight testleri
+- Import conflict transaction rollback testi
 - v1 ve tarihsel v2/v3/v4/v5 → v6 migration testleri
 - Full encrypted backup/restore round-trip testi
 - Failed restore atomic rollback testi
+- PDF/CSV/XLSX regression testleri
 - Kritik entegrasyon zinciri:
 
 ```text
@@ -335,25 +340,21 @@ Tercih edilen yön: local-first premium uygulama. Fiyat ve paket sınırları ge
 # Güncel çalışma sırası
 
 ```text
-1. Report/export regression coverage
+1. Desktop keyboard grading polish
 ↓
-2. Import existing-duplicate preflight
+2. Accessibility + font scaling audit/test
 ↓
-3. Desktop keyboard grading polish
+3. Gerçek öğretmen beta
 ↓
-4. Accessibility + font scaling audit/test
+4. Beta P0/P1 düzeltmeleri
 ↓
-5. Gerçek öğretmen beta
+5. Final icon + screenshot assetleri
 ↓
-6. Beta P0/P1 düzeltmeleri
+6. Signing / TestFlight / Play internal testing
 ↓
-7. Final icon + screenshot assetleri
+7. Ticari model ve IAP kararı
 ↓
-8. Signing / TestFlight / Play internal testing
-↓
-9. Ticari model ve IAP kararı
-↓
-10. Ölçerim 1.0 RC
+8. Ölçerim 1.0 RC
 ```
 
 ## Yol haritası kuralı
