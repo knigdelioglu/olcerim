@@ -1,421 +1,363 @@
 # Ölçerim — Ürün Yol Haritası
 
-Bu belge, mevcut mimari iskeletten pazarlanabilir **Ölçerim 1.0** sürümüne kadar izlenecek geliştirme sırasını tanımlar.
+Bu belge, **Ölçerim 1.0** için güncel ürün durumunu, kalan işleri ve faz çıkış kriterlerini tanımlar.
 
 > Ürün vaadi: **Sınıfını aktar, değerlendirme aracını oluştur, öğrencilerini hızlıca değerlendir ve sonucu hemen raporla. Verilerin cihazından çıkmasın.**
 
-## Mevcut durum
+## Durum özeti
 
-Repo şu anda ürünün mimari başlangıç noktasındadır:
+Güncel `main`, artık mimari iskelet değil çalışan bir local-first üründür. Uygulama Android, iOS/iPadOS ve macOS hedeflerini; ilişkisel Drift/SQLite veri modelini; Excel/CSV importunu; rubrik ve hızlı ölçek değerlendirmelerini; telefon ve geniş ekran puanlama akışlarını; sonuç ekranlarını; PDF/XLSX/CSV exportunu; yazdırma/paylaşmayı; şifreli backup/restore'u; onboarding'i; tema ayarlarını; demo verisini ve hazır rubrik şablonlarını içerir.
 
-- Flutter + Material 3 iskeleti
-- Riverpod altyapısı
-- Drift + SQLite veri katmanı
-- Students / Rubrics / RubricCriteria / EvaluationEntries ilk şeması
-- DAO ve repository başlangıç yapısı
-- Excel, PDF ve backup servis sözleşmeleri
-- Android / iOS / macOS hedefleri
+Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerinde `build_runner`, `flutter analyze`, `flutter test`, Android APK/AAB, unsigned iOS release ve macOS release buildlerini çalıştırır. Aynı kapı artık `main` pushlarının yanında `main` hedefli pull requestlerde de çalışır.
 
-Bu aşama **çalışan ürün değil, geliştirmeye hazır mimari tabandır**.
+### Faz durumları
+
+| Faz | Durum | Kalan ana iş |
+|---|---|---|
+| 0 — Teknik temel | **DONE** | — |
+| 1 — Sınıf/öğrenci | **PARTIAL** | mevcut sınıftaki duplicate import preflight; eğitim yılı edit/archive polish |
+| 2 — Assessment domain | **DONE** | — |
+| 3 — Hızlı değerlendirme | **PARTIAL** | klavye navigasyonu/shortcut; isteğe bağlı toplu puanlama |
+| 4 — Rubrik oluşturucu | **DONE** | — |
+| 5 — Sonuç/analiz | **DONE** | — |
+| 6 — PDF/Excel/Print | **DONE** | export regression coverage sürekli korunmalı |
+| 7 — Backup/Restore | **DONE** | — |
+| 8 — Ürün UX | **PARTIAL** | erişilebilirlik/font-scaling cihaz doğrulaması |
+| 9 — Güvenilirlik | **PARTIAL** | platform UI/widget coverage genişletilmeli |
+| 10 — Gerçek öğretmen beta | **BLOCKED/EXTERNAL** | gerçek beta oturumları ve PASS kanıtı |
+| 11 — Store/dağıtım | **BLOCKED/EXTERNAL** | signing, TestFlight, Play internal/closed testing, notarization |
+| 12 — Ticari katman | **NOT STARTED BY DESIGN** | Faz 10 doğrulanmadan başlanmaz |
+| 13 — Lansman paketi | **PARTIAL** | gerçek store screenshotları ve final platform app icon assetleri |
 
 ---
 
 ## Faz 0 — Çalışan teknik temel
 
-### Amaç
-İskeleti üç platformda açılan, veri yazıp okuyabilen gerçek uygulama tabanına dönüştürmek.
+**Durum: DONE**
 
-### İşler
-- Android, iOS ve macOS runnerlarını üret.
-- Bağımlılıkları kur ve Drift code generation'ı tamamla.
-- Database lifecycle ve provider ağacını tamamla.
-- Global error handling ve temel logging ekle.
-- Placeholder repository/service kodlarını temizle.
-- İlk migration test altyapısını kur.
+- Android, iOS ve macOS runner üretimi
+- Drift code generation ve database lifecycle
+- Riverpod provider ağı
+- Global error handling ve logging
+- Migration altyapısı
+- CI analyze/test/build kapısı
 
 ### Çıkış kriteri
-- Android, iOS ve macOS'ta uygulama açılır.
-- SQLite oluşturulur.
-- Veri yazılır, okunur ve uygulama yeniden açıldığında korunur.
-- İlk migration testi çalışır.
+Üç hedef için release build üretilebiliyor; SQLite yaşam döngüsü ve migration zinciri testlerle korunuyor.
 
 ---
 
 ## Faz 1 — Sınıf ve öğrenci yönetimi
 
-### Amaç
-Öğretmenin gerçek bir sınıfı uygulamaya eksiksiz taşıyabilmesi.
+**Durum: PARTIAL**
 
-### Veri modeli
-Mevcut `Student.className` yaklaşımı kaldırılarak ilişkisel model kurulmalıdır:
+### Tamamlanan
+- `SchoolYear → Course → Classroom → Student` ilişkisel modeli
+- Sınıf oluşturma/düzenleme/arşivleme
+- Manuel öğrenci CRUD ve arşivleme
+- Excel/CSV import
+- Kolon algılama, önizleme ve satır doğrulama
+- Dosya içi duplicate tespiti
+- Transaction/batch ile toplu yazma
 
-```text
-SchoolYear
-Classroom
-Course
-Student
-```
-
-### İşler
-- Eğitim yılı yönetimi
-- Sınıf oluşturma / düzenleme / arşivleme
-- Ders ilişkilendirme
-- Manuel öğrenci ekleme / düzenleme / arşivleme
-- Excel ve CSV içe aktarma
-- Import önizleme ve satır doğrulama
-- Duplicate / eksik veri yönetimi
-
-### Import akışı
-
-```text
-Dosya seç
-→ kolonları algıla
-→ önizleme
-→ hatalı satırları göster
-→ kullanıcı onayı
-→ tek transaction ile içe aktar
-```
+### Kalan
+- Import önizlemesinde mevcut sınıf DB'siyle okul numarası çakışmalarını satır bazında göstermek
+- Gerekirse skip/update/cancel politikası tanımlamak
+- Eğitim yılı düzenleme/arşivleme UX'ini tamamlamak
 
 ### Çıkış kriteri
-Gerçek bir öğretmen 30–40 öğrencilik bir sınıfı birkaç dakika içinde oluşturabilmelidir.
+30–40 öğrencilik gerçek sınıf birkaç dakika içinde güvenli biçimde oluşturulabilmeli; conflict sonucu kullanıcıya import başlamadan önce açıkça gösterilmelidir.
 
 ---
 
 ## Faz 2 — Değerlendirme domain modeli
 
-### Amaç
-Ürünü yalnız “rubrik uygulaması” olmaktan çıkarıp genel performans değerlendirme çekirdeğine oturtmak.
+**Durum: DONE**
 
-### Hedef model
+Çekirdek model:
 
 ```text
 Assessment
 AssessmentType
 Rubric
 RubricCriterion
+RubricLevel
 Evaluation
 EvaluationEntry
 ObservationNote
 ```
 
-### Ölçerim 1.0 değerlendirme tipleri
+1.0 tipleri:
 1. Rubrik
 2. Hızlı derecelendirme ölçeği
 
-Kontrol listesi, serbest gözlem ve diğer tipler sonraki sürümlere bırakılabilir.
-
-### Çıkış kriteri
-Bir değerlendirme, sınıftan ve rubrik şablonundan bağımsız şekilde oluşturulup bir sınıfa uygulanabilmelidir.
+Assessment oluşturulurken rubrik snapshot'ı alınır; evaluation kayıtları sınıftaki aktif öğrenciler için canonical write path üzerinden üretilir.
 
 ---
 
 ## Faz 3 — Hızlı değerlendirme ekranı
 
-### Amaç
-Öğretmenin ders sırasında mümkün olan en az etkileşimle öğrencileri puanlayabilmesi.
+**Durum: PARTIAL**
 
-### Tablet / macOS
-Tablo ağırlıklı toplu değerlendirme görünümü.
-
-### Telefon
-Tek öğrenci odaklı, büyük dokunma hedefleri olan ardışık değerlendirme görünümü.
-
-### İşler
+### Tamamlanan
+- Telefon için tek öğrenci odaklı akış
+- Tablet/macOS için gradebook görünümü
 - Otomatik kayıt
-- Önceki / sonraki öğrenci
-- Tamamlandı / eksik durumu
-- Değerlendirilmeyenleri filtreleme
-- Not ekleme
-- Klavye, dokunmatik ve tablet kullanım optimizasyonu
-- Gerekli yerlerde toplu puanlama
+- Önceki/sonraki öğrenci
+- notStarted/incomplete/completed durumları
+- Değerlendirilmeyen/eksik filtreleri
+- Kriter notu, öğrenci notu ve zaman damgalı gözlem
+
+### Kalan
+- macOS/tablet için gerçek klavye focus navigasyonu ve shortcutlar
+- Kullanıcı testinde ihtiyaç doğrulanırsa toplu puanlama
 
 ### Çıkış kriteri
-30 öğrencilik bir sınıf, veri kaybı veya sürekli “Kaydet” gereksinimi olmadan akıcı biçimde değerlendirilebilmelidir.
+30 öğrencilik sınıf veri kaybı veya manuel Kaydet ihtiyacı olmadan akıcı değerlendirilmeli; desktop kullanıcısı yalnız fareye bağımlı bırakılmamalıdır.
 
 ---
 
 ## Faz 4 — Rubrik oluşturucu
 
-### Basit mod
-- Kriter adı
-- Maksimum puan
-- Açıklama
-- Sıralama
+**Durum: DONE**
 
-### Gelişmiş mod
-- Performans seviyeleri
-- Seviye açıklamaları
-- Seviye bazlı puanlar
-
-### İşler
-- Rubrik CRUD
-- Kriter CRUD
-- Rubrik çoğaltma
-- Şablon olarak saklama
-- Başka sınıf / değerlendirmede yeniden kullanma
-
-### Çıkış kriteri
-Öğretmen mevcut bir şablonu kopyalayıp birkaç düzenlemeyle yeni değerlendirme oluşturabilmelidir.
+- Basit kriter editörü
+- Maksimum puan/açıklama/sıra
+- Gelişmiş performans seviyeleri
+- Rubrik düzenleme, çoğaltma, arşivleme
+- Şablon olarak tekrar kullanım
 
 ---
 
 ## Faz 5 — Sonuç ve temel analiz
 
-### Sınıf görünümü
+**Durum: DONE**
+
 - Sınıf ortalaması
 - Kriter ortalamaları
-- Tamamlanan / eksik değerlendirme sayısı
-- Öğrenci bazlı toplamlar
+- Tamamlanan/eksik öğrenci sayısı
+- Öğrenci toplamları
+- Öğrenci drill-down
+- Kriter/öğrenci/gözlem notları
+- En güçlü kriter ve gelişim alanı gibi temel özetler
 
-### Öğrenci görünümü
-- Kriter puanları
-- Toplam puan
-- Değerlendirme notları
-
-### Sınır
-1.0'da ağır istatistik, tahmin veya yapay zekâ analizi yapılmayacaktır.
-
-### Çıkış kriteri
-Öğretmen sınıfın ve tek öğrencinin performansını birkaç saniye içinde anlayabilmelidir.
+1.0 sınırı gereği ağır BI, tahminleme veya AI analizi yoktur.
 
 ---
 
 ## Faz 6 — PDF / Excel / Yazdırma
 
-### Minimum çıktılar
-1. Öğrenci değerlendirme formu
-2. Sınıf değerlendirme çizelgesi
-3. Excel/CSV sonuç tablosu
+**Durum: DONE**
 
-### İşler
-- PDF üretimi
-- Excel export
-- Print / AirPrint / Android Print
-- Sistem Share Sheet
-- Dosyalara Kaydet / AirDrop / Drive / Mail gibi hedeflere aktarım
+Çıktılar:
+1. Öğrenci değerlendirme PDF'i
+2. Sınıf değerlendirme çizelgesi PDF'i
+3. XLSX sonuç tablosu
+4. CSV sonuç tablosu
+5. Sistem yazdırma/paylaşma akışları
 
-### Çıkış kriteri
-Öğretmen değerlendirme sonucunu uygulama dışına standart bir dosya olarak çıkarabilmelidir.
+### Kalite kapısı
+Export regression testleri şu invariants'ı korumalıdır:
+- öğrenci/kriter eşleşmesi
+- toplam ve durum alanları
+- kriter/öğretmen/gözlem notları
+- Türkçe karakterler
+- eksik değerlendirme
+- öğrencisiz değerlendirme
+- CSV ve XLSX mantıksal içerik eşitliği
 
 ---
 
 ## Faz 7 — Şifreli yedekleme ve geri yükleme
 
-### Amaç
-Sunucusuz ürünün temel veri kaybı riskini yönetmek.
+**Durum: DONE**
 
-### Backup kapsamı
-- Eğitim yılları
-- Sınıflar
-- Öğrenciler
-- Rubrikler
-- Değerlendirmeler
-- Uygulama ayarları
+- Sürümlü backup envelope
+- AES-256-GCM authenticated encryption
+- PBKDF2-HMAC-SHA256, 600.000 iterasyon, 256-bit anahtar
+- Random salt ve nonce
+- Restore öncesi metadata/count preview
+- Tüm kullanıcı tablolarını kapsayan backup
+- Tek DB transaction içinde atomik restore
+- Restore sonrası evaluation-status invariant onarımı
 
-### Gereksinimler
-- Sürümlü backup formatı
-- AEAD tabanlı şifreleme
-- Güvenli KDF
-- Restore öncesi metadata önizlemesi
-- Restore doğrulaması
-- Atomik restore
+### Zorunlu invariant
 
-### Kritik invariant
-**Restore ya tamamen başarılı olur ya da mevcut veritabanı hiç değişmez.**
+```text
+DB A
+→ encrypted backup
+→ clean DB B
+→ restore
+→ A.data == B.data
+```
 
-### Çıkış kriteri
-Backup → temiz veritabanı → restore sonucunda anlamlı kullanıcı verisi birebir geri gelmelidir.
+Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı test edilir.
 
 ---
 
 ## Faz 8 — Ürün UX'i
 
-### İşler
-- İlk açılış deneyimi
-- Empty state'ler
-- Açık eylem butonları
-- Kullanıcı dostu hata mesajları
-- Undo / arşivleme akışları
-- Dark mode
-- Font scaling
-- Tablet landscape
-- VoiceOver / TalkBack temel erişilebilirlik
-- Minimum dokunma hedefleri
+**Durum: PARTIAL**
 
-### Çıkış kriteri
-Yeni kullanıcı teknik açıklamaya ihtiyaç duymadan ilk sınıfını oluşturabilmelidir.
+### Tamamlanan
+- Onboarding
+- Empty state'ler
+- Responsive telefon/tablet/macOS yerleşimleri
+- Dark/light/system tema
+- Kullanıcı dostu hata yüzeyleri
+- Archive/Undo yaklaşımı
+- Temel semantic label kullanımı
+
+### Kalan
+- VoiceOver/TalkBack gerçek cihaz doğrulaması
+- büyük font/font scaling kontrolü
+- minimum touch target audit'i
+- tablet landscape ve macOS pencere boyutu regresyonları
 
 ---
 
 ## Faz 9 — Güvenilirlik ve test kapıları
 
-### Domain testleri
-- Puan hesaplama
-- Maksimum skor kuralları
-- Değerlendirme durumları
+**Durum: PARTIAL — veri güvenliği P0'ları kapalı**
 
-### Database testleri
-- CRUD
-- Foreign key
-- Transaction
-- Migration
-
-### Import testleri
-- Boş dosya
-- Bozuk dosya
-- Duplicate öğrenci
-- Türkçe karakterler
-- Büyük sınıf / büyük dosya
-
-### Backup testleri
+### Mevcut kapsam
+- Domain invariant testleri
+- FK/transaction/rollback testleri
+- Import testleri
+- v1 ve tarihsel v2/v3/v4/v5 → v6 migration testleri
+- Full encrypted backup/restore round-trip testi
+- Failed restore atomic rollback testi
+- Kritik entegrasyon zinciri:
 
 ```text
-DB A
-→ backup
-→ temiz DB
-→ restore
-→ DB B
-
-A == B
+CSV import
+→ rubrik
+→ assessment
+→ puanlama/not/gözlem
+→ sonuç
+→ PDF/CSV/XLSX
+→ DB restart
+→ encrypted backup
+→ clean DB restore
 ```
 
-### UI testleri
-- Telefon
-- Tablet
-- macOS
-- Kritik değerlendirme akışları
+### Kalan
+- Telefon/tablet/macOS widget/UI test kapsamını genişletmek
+- Accessibility/font scaling testlerini otomasyona uygun yerlerde eklemek
+- Yeni export ve migration değişikliklerinde regression test zorunluluğunu sürdürmek
 
 ### Çıkış kriteri
-Veri kaybı yaratabilecek hiçbir kritik akış testsiz kalmaz.
+Veri kaybı veya yanlış veri eşlemesi yaratabilecek hiçbir kritik akış testsiz kalmaz.
 
 ---
 
 ## Faz 10 — Gerçek öğretmen beta testi
 
-### Zorunlu görev senaryoları
-1. Sınıf oluştur.
-2. Excel'den öğrenci aktar.
-3. Rubrik oluştur.
-4. Öğrencileri değerlendir.
-5. Bir puanı değiştir.
-6. PDF / Excel çıkar.
-7. Uygulamayı kapat ve tekrar aç.
-8. Yedek al.
-9. Yedeği geri yükle.
+**Durum: BLOCKED/EXTERNAL — gerçek kullanıcı kanıtı gerekli**
 
-### İzlenecek UX sinyalleri
-- Kullanıcının durup düşündüğü yerler
-- Gereksiz tıklamalar
-- Yanlış anlaşılabilen kavramlar
-- Değerlendirme sırasında tempo kaybı
+Repo `BETA_TEST_PLAN.md` ve `BETA_OBSERVATION_FORM.md` sağlar. Bu faz kod veya sentetik fixture ile PASS sayılamaz.
+
+Zorunlu ana görevler:
+1. Sınıf oluştur
+2. Excel/CSV'den öğrenci aktar
+3. Rubrik oluştur
+4. Öğrencileri değerlendir
+5. Puan değiştir
+6. Sonuç/PDF/XLSX çıkar
+7. Uygulamayı kapat/aç
+8. Yedek al
+9. Temiz kurulumda restore et
 
 ### Çıkış kriteri
-Gerçek öğretmenler ana akışı yardım almadan tamamlayabilmelidir.
+Gerçek öğretmenler ana akışı geliştirici müdahalesi olmadan tamamlar ve kritik veri doğruluğu problemi görülmez.
 
 ---
 
 ## Faz 11 — Store ve dağıtım hazırlığı
 
-### Apple
-- Bundle ID
-- Signing
-- App icon
-- Launch screen
-- Privacy manifest
-- TestFlight
-- macOS signing / notarization / sandbox izinleri
+**Durum: BLOCKED/EXTERNAL**
 
-### Android
-- Application ID
-- Signing key
-- AAB
-- Play Console
-- Data Safety
-- Internal / closed testing
+### Repo tarafında hazır
+- `com.knigdelioglu.olcerim` kimliği
+- Android/iOS/macOS runner üretimi
+- Privacy manifest başlangıcı
+- macOS sandbox/file/print entitlementları
+- Android APK/AAB, unsigned iOS ve macOS release CI buildleri
+
+### Hesap/signing ortamında tamamlanacak
+- Apple App ID/certificate/provisioning
+- TestFlight archive
+- macOS notarization veya Mac App Store signing
+- Play Console + Play App Signing + upload key
+- Internal/closed testing
+- Store privacy/data-safety formları
 
 ### Çıkış kriteri
-Store review'a gönderilebilir release candidate oluşur.
+Gerçek imzalı release candidate store review'a gönderilebilir durumda olmalıdır.
 
 ---
 
 ## Faz 12 — Ticari ürün katmanı
 
-1.0 için tercih edilen model: **local-first premium uygulama**.
+**Durum: NOT STARTED BY DESIGN**
 
-Olası paketleme:
+Mevcut kodda local entitlement/cache iskeleti bulunabilir; gerçek satın alma/paywall/receipt doğrulama Faz 10 beta doğrulanmadan tamamlanmaz.
 
-### Ücretsiz
-- Sınırlı sınıf / rubrik
-- Temel değerlendirme
-
-### Pro
-- Sınırsız sınıf ve öğrenci
-- Tüm rubrik özellikleri
-- PDF / Excel
-- Backup / restore
-- Gelişmiş temel raporlar
-
-Fiyatlandırma ve satın alma mekanizması, ürünün ana iş akışı beta testinde doğrulandıktan sonra uygulanmalıdır.
+Tercih edilen yön: local-first premium uygulama. Fiyat ve paket sınırları gerçek beta bulgularından sonra sabitlenir.
 
 ---
 
 ## Faz 13 — Lansman paketi
 
-- Uygulama ikonu
-- Görsel kimlik
-- Store ekran görüntüleri
-- Store açıklamaları
-- Gizlilik politikası
-- Destek kanalı
-- Kullanım rehberi
-- Sürüm notları
-- Demo sınıfı
-- Hazır rubrik şablonları
+**Durum: PARTIAL**
 
-Önerilen ilk şablonlar:
-- Sözlü Sunum
-- Konuşma Becerisi
-- Proje Değerlendirme
-- Grup Çalışması
-- Okuma Becerisi
-- Yazma Becerisi
+### Hazır
+- Görsel kimlik başlangıcı
+- Store metadata taslakları
+- Gizlilik politikası/data-safety belgeleri
+- Destek/kullanım rehberi/sürüm notları
+- Demo feature
+- 6 başlangıç rubrik şablonu:
+  - Sözlü Sunum
+  - Konuşma Becerisi
+  - Proje Değerlendirme
+  - Grup Çalışması
+  - Okuma Becerisi
+  - Yazma Becerisi
+
+### Kalan
+- Final platform app icon seti ve runner üretim pipeline'ına uygulanması
+- Gerçek cihaz/simulator store screenshotları
+- Beta sonrası son store metni/polish
 
 ---
 
-# Geliştirme sırası
+# Güncel çalışma sırası
 
 ```text
-0. Platform + DB temelini doğrula
+1. Report/export regression coverage
 ↓
-1. Classroom + Student
+2. Import existing-duplicate preflight
 ↓
-2. Excel / CSV import
+3. Desktop keyboard grading polish
 ↓
-3. Assessment domain modeli
+4. Accessibility + font scaling audit/test
 ↓
-4. Rubric editor
+5. Gerçek öğretmen beta
 ↓
-5. Hızlı değerlendirme ekranı
+6. Beta P0/P1 düzeltmeleri
 ↓
-6. Sonuç ekranları
+7. Final icon + screenshot assetleri
 ↓
-7. PDF / Excel / Print
+8. Signing / TestFlight / Play internal testing
 ↓
-8. Backup / Restore
+9. Ticari model ve IAP kararı
 ↓
-9. UX polish
-↓
-10. Migration + regression testleri
-↓
-11. Gerçek öğretmen beta
-↓
-12. Store hazırlığı
-↓
-13. Ölçerim 1.0
+10. Ölçerim 1.0 RC
 ```
 
 ## Yol haritası kuralı
 
-Bir fazın veri modeli veya temel invariant'ı tamamlanmadan sonraki fazın görsel özelliklerine geçilmemelidir. Özellikle migration, backup ve değerlendirme veri bütünlüğü “sonra bakılacak teknik borç” olarak ertelenemez.
+Migration, backup/restore, değerlendirme veri bütünlüğü ve yanlış öğrenciye/sınıfa veri bağlanması hiçbir zaman “sonra bakılacak” teknik borç kabul edilmez. Dış doğrulama gerektiren beta ve signing maddeleri, sentetik veri veya doküman varlığıyla tamamlanmış işaretlenemez.
 
 Kapsam sınırları için bkz. [`PRODUCT_SCOPE.md`](PRODUCT_SCOPE.md).
