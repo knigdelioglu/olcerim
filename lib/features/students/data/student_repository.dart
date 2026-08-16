@@ -8,7 +8,8 @@ class StudentRepository {
   Stream<List<Student>> watchStudents(int classroomId, {bool archived = false}) =>
       _database.studentDao.watchStudents(classroomId, archived: archived);
 
-  Stream<List<Student>> watchArchivedStudents() => _database.studentDao.watchArchivedStudents();
+  Stream<List<Student>> watchArchivedStudents() =>
+      _database.studentDao.watchArchivedStudents();
 
   Future<List<Student>> studentsForClassroom(int classroomId) =>
       _database.studentDao.studentsForClassroom(classroomId);
@@ -26,8 +27,18 @@ class StudentRepository {
         fullName: fullName,
       );
 
-  Future<void> importStudents(int classroomId, List<StudentImportRecord> records) =>
+  Future<List<StudentImportConflict>> findImportConflicts(
+    int classroomId,
+    List<StudentImportRecord> records,
+  ) =>
+      _database.studentDao.findImportConflicts(classroomId, records);
+
+  Future<void> importStudents(
+    int classroomId,
+    List<StudentImportRecord> records,
+  ) =>
       _database.studentDao.insertMultipleStudents(classroomId, records);
 
-  Future<void> setArchived(int id, bool archived) => _database.studentDao.setArchived(id, archived);
+  Future<void> setArchived(int id, bool archived) =>
+      _database.studentDao.setArchived(id, archived);
 }
