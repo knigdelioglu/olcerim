@@ -21,7 +21,12 @@ class _ClassroomsViewState extends ConsumerState<ClassroomsView> {
   Widget build(BuildContext context) {
     final years = ref.watch(schoolYearsProvider).valueOrNull ?? const [];
     final active = ref.watch(activeSchoolYearProvider).valueOrNull;
-    selectedYearId ??= active?.id ?? (years.isEmpty ? null : years.first.id);
+    final visibleYearIds = years.map((year) => year.id).toSet();
+    if (selectedYearId == null || !visibleYearIds.contains(selectedYearId)) {
+      selectedYearId = active != null && visibleYearIds.contains(active.id)
+          ? active.id
+          : (years.isEmpty ? null : years.first.id);
+    }
     final classrooms = ref.watch(classroomsProvider(selectedYearId));
     return Scaffold(
       appBar: AppBar(

@@ -8,6 +8,7 @@ class ClassroomRepository {
   SchoolDao get _dao => _database.schoolDao;
 
   Stream<List<SchoolYear>> watchSchoolYears() => _dao.watchSchoolYears();
+  Stream<List<SchoolYear>> watchArchivedSchoolYears() => _dao.watchArchivedSchoolYears();
   Future<SchoolYear?> activeSchoolYear() => _dao.activeSchoolYear();
 
   Future<int> createSchoolYear({
@@ -23,7 +24,22 @@ class ClassroomRepository {
         makeActive: makeActive,
       );
 
+  Future<void> updateSchoolYear({
+    required int id,
+    required String label,
+    required DateTime startsAt,
+    required DateTime endsAt,
+  }) =>
+      _dao.updateSchoolYear(
+        id: id,
+        label: label,
+        startsAt: startsAt,
+        endsAt: endsAt,
+      );
+
   Future<void> setActiveSchoolYear(int id) => _dao.setActiveSchoolYear(id);
+  Future<void> setSchoolYearArchived(int id, bool archived) =>
+      _dao.setSchoolYearArchived(id, archived);
 
   Stream<List<ClassroomSummaryRow>> watchClassrooms({int? schoolYearId, bool archived = false}) =>
       _dao.watchClassrooms(schoolYearId: schoolYearId, archived: archived);
