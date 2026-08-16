@@ -476,13 +476,13 @@ class _GradebookState extends ConsumerState<_Gradebook> {
                 ),
               ),
               if (widget.criteria.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
                   child: Tooltip(
                     message:
                         'Klavye: Tab ile puan hücresine geçin; ok tuşlarıyla hareket edin; '
                         'Home/End ile satırın başına/sonuna gidin; Enter veya Space ile puanlayın.',
-                    child: Semantics(
+                    child: const Semantics(
                       label: 'Klavye kısayolları bilgisi',
                       child: Icon(Icons.keyboard_alt_outlined),
                     ),
