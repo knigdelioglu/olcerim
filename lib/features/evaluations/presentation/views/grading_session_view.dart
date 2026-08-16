@@ -8,6 +8,7 @@ import 'package:olcerim/core/database/daos/evaluation_dao.dart';
 import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
 import 'package:olcerim/features/evaluations/presentation/controllers/evaluation_providers.dart';
 import 'package:olcerim/features/evaluations/presentation/gradebook_keyboard_navigation.dart';
+import 'package:olcerim/features/evaluations/presentation/gradebook_layout_metrics.dart';
 import 'package:olcerim/features/evaluations/presentation/views/assessment_results_view.dart';
 import 'package:olcerim/features/evaluations/presentation/views/evaluation_notes_sheet.dart';
 import 'package:olcerim/features/evaluations/presentation/views/score_picker.dart';
@@ -463,6 +464,9 @@ class _GradebookState extends ConsumerState<_Gradebook> {
   Widget build(BuildContext context) {
     const nameWidth = 280.0;
     const cellWidth = 148.0;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final headerHeight = GradebookLayoutMetrics.headerHeight(textScaler);
+    final rowHeight = GradebookLayoutMetrics.rowHeight(textScaler);
     return Column(
       children: [
         Padding(
@@ -502,14 +506,16 @@ class _GradebookState extends ConsumerState<_Gradebook> {
                   width: nameWidth,
                   child: Column(
                     children: [
-                      const SizedBox(
-                        height: 52,
-                        child: Padding(
+                      SizedBox(
+                        height: headerHeight,
+                        child: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16),
                           child: Align(alignment: Alignment.centerLeft, child: Text('Öğrenci')),
                         ),
                       ),
-                      ...widget.students.map((row) => _StudentNameCell(row: row)),
+                      ...widget.students.map(
+                        (row) => _StudentNameCell(row: row, rowHeight: rowHeight),
+                      ),
                     ],
                   ),
                 ),
@@ -520,14 +526,18 @@ class _GradebookState extends ConsumerState<_Gradebook> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          height: 52,
+                          height: headerHeight,
                           child: Row(
                             children: [
                               ...widget.criteria.map(
                                 (criterion) => SizedBox(
                                   width: cellWidth,
                                   child: Center(
-                                    child: Text(criterion.title, overflow: TextOverflow.ellipsis),
+                                    child: Text(
+                                      criterion.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -539,6 +549,7 @@ class _GradebookState extends ConsumerState<_Gradebook> {
                               (studentEntry) => _ScoreRow(
                                 rowIndex: studentEntry.key,
                                 row: studentEntry.value,
+                                rowHeight: rowHeight,
                                 criteria: widget.criteria,
                                 cellWidth: cellWidth,
                                 focusNodeFor: (columnIndex) =>
@@ -567,12 +578,14 @@ class _GradebookState extends ConsumerState<_Gradebook> {
 }
 
 class _StudentNameCell extends StatelessWidget {
-  const _StudentNameCell({required this.row});
+  const _StudentNameCell({required this.row, required this.rowHeight});
+
   final EvaluationStudentRow row;
+  final double rowHeight;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        height: 64,
+        height: rowHeight,
         child: Padding(
           padding: const EdgeInsets.only(left: 16, right: 4),
           child: Row(
@@ -584,9 +597,18 @@ class _StudentNameCell extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(row.student.fullName, overflow: TextOverflow.ellipsis),
+                    Text(
+                      row.student.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     if (row.student.schoolNumber != null)
-                      Text(row.student.schoolNumber!, style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        row.student.schoolNumber!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                   ],
                 ),
               ),
@@ -605,6 +627,7 @@ class _ScoreRow extends ConsumerWidget {
   const _ScoreRow({
     required this.rowIndex,
     required this.row,
+    required this.rowHeight,
     required this.criteria,
     required this.cellWidth,
     required this.focusNodeFor,
@@ -614,6 +637,7 @@ class _ScoreRow extends ConsumerWidget {
 
   final int rowIndex;
   final EvaluationStudentRow row;
+  final double rowHeight;
   final List<RubricCriterion> criteria;
   final double cellWidth;
   final FocusNode Function(int columnIndex) focusNodeFor;
@@ -664,7 +688,7 @@ class _ScoreRow extends ConsumerWidget {
     }
 
     return SizedBox(
-      height: 64,
+      height: rowHeight,
       child: Row(
         children: [
           ...criteria.asMap().entries.map((criterionEntry) {
@@ -695,7 +719,6 @@ class _ScoreRow extends ConsumerWidget {
                   if (entry != null)
                     IconButton(
                       tooltip: 'Kriter notu',
-                      visualDensity: VisualDensity.compact,
                       onPressed: () => showCriterionNoteDialog(
                         context: context,
                         ref: ref,
@@ -768,6 +791,9 @@ class _KeyboardScoreCell extends StatelessWidget {
               label: semanticLabel,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 80),
+                constraints: const BoxConstraints(
+                  minHeight: GradebookLayoutMetrics.minimumTouchTarget,
+                ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
