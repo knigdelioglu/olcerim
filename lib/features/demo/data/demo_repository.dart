@@ -7,6 +7,8 @@ class DemoRepository {
   DemoRepository(this._database);
   final AppDatabase _database;
 
+  static const int demoStudentCount = 30;
+
   Future<int> createDemoWorkspace() async {
     final year = await _database.schoolDao.activeSchoolYear();
     if (year == null) throw StateError('Aktif eğitim yılı bulunamadı.');
@@ -18,7 +20,13 @@ class DemoRepository {
     );
     await _database.studentDao.insertMultipleStudents(
       classId,
-      List.generate(12, (index) => StudentImportRecord(fullName: 'Demo Öğrenci ${(index + 1).toString().padLeft(2, '0')}', schoolNumber: '${100 + index + 1}')),
+      List.generate(
+        demoStudentCount,
+        (index) => StudentImportRecord(
+          fullName: 'Demo Öğrenci ${(index + 1).toString().padLeft(2, '0')}',
+          schoolNumber: '${100 + index + 1}',
+        ),
+      ),
     );
     final rubricId = await _database.rubricDao.saveDraft(
       RubricDraft(
