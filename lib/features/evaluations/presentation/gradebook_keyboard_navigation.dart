@@ -78,16 +78,22 @@ GradebookCellPosition moveGradebookCell({
   switch (command) {
     case GradebookKeyboardCommand.moveLeft:
       column = (column - 1).clamp(0, maxColumn);
+      break;
     case GradebookKeyboardCommand.moveRight:
       column = (column + 1).clamp(0, maxColumn);
+      break;
     case GradebookKeyboardCommand.moveUp:
       row = (row - 1).clamp(0, maxRow);
+      break;
     case GradebookKeyboardCommand.moveDown:
       row = (row + 1).clamp(0, maxRow);
+      break;
     case GradebookKeyboardCommand.rowStart:
       column = 0;
+      break;
     case GradebookKeyboardCommand.rowEnd:
       column = maxColumn;
+      break;
     case GradebookKeyboardCommand.none:
     case GradebookKeyboardCommand.activate:
       break;
