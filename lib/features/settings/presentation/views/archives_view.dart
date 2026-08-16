@@ -32,10 +32,11 @@ class _ArchivesViewState extends ConsumerState<ArchivesView> {
               padding: const EdgeInsets.all(16),
               child: SegmentedButton<int>(
                 segments: const [
-                  ButtonSegment(value: 0, label: Text('Sınıflar')),
-                  ButtonSegment(value: 1, label: Text('Öğrenciler')),
-                  ButtonSegment(value: 2, label: Text('Rubrikler')),
-                  ButtonSegment(value: 3, label: Text('Değerlendirmeler')),
+                  ButtonSegment(value: 0, label: Text('Eğitim yılları')),
+                  ButtonSegment(value: 1, label: Text('Sınıflar')),
+                  ButtonSegment(value: 2, label: Text('Öğrenciler')),
+                  ButtonSegment(value: 3, label: Text('Rubrikler')),
+                  ButtonSegment(value: 4, label: Text('Değerlendirmeler')),
                 ],
                 selected: {section},
                 onSelectionChanged: (values) => setState(() => section = values.first),
@@ -43,14 +44,41 @@ class _ArchivesViewState extends ConsumerState<ArchivesView> {
             ),
             Expanded(
               child: switch (section) {
-                0 => _classrooms(),
-                1 => _students(),
-                2 => _rubrics(),
+                0 => _schoolYears(),
+                1 => _classrooms(),
+                2 => _students(),
+                3 => _rubrics(),
                 _ => _assessments(),
               },
             ),
           ],
         ),
+      );
+
+  Widget _schoolYears() => ref.watch(archivedSchoolYearsProvider).when(
+        data: (items) => items.isEmpty
+            ? const _Empty(text: 'Arşivlenmiş eğitim yılı yok.')
+            : ListView(
+                children: items
+                    .map(
+                      (year) => ListTile(
+                        title: Text(year.label),
+                        subtitle: Text(
+                          '${year.startsAt.day}.${year.startsAt.month}.${year.startsAt.year} – '
+                          '${year.endsAt.day}.${year.endsAt.month}.${year.endsAt.year}',
+                        ),
+                        trailing: TextButton(
+                          onPressed: () => ref
+                              .read(classroomRepositoryProvider)
+                              .setSchoolYearArchived(year.id, false),
+                          child: const Text('Geri yükle'),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Center(child: Text('Arşiv yüklenemedi.')),
       );
 
   Widget _classrooms() => ref.watch(archivedClassroomsProvider).when(

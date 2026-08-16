@@ -6,24 +6,24 @@ Bu belge, **Ölçerim 1.0** için güncel ürün durumunu, kalan işleri ve faz 
 
 ## Durum özeti
 
-Güncel `main`, artık mimari iskelet değil çalışan bir local-first üründür. Uygulama Android, iOS/iPadOS ve macOS hedeflerini; ilişkisel Drift/SQLite veri modelini; Excel/CSV importunu; rubrik ve hızlı ölçek değerlendirmelerini; telefon ve geniş ekran puanlama akışlarını; sonuç ekranlarını; PDF/XLSX/CSV exportunu; yazdırma/paylaşmayı; şifreli backup/restore'u; onboarding'i; tema ayarlarını; demo verisini ve hazır rubrik şablonlarını içerir.
+Ölçerim artık mimari iskelet değil çalışan bir local-first ürün adayıdır. Uygulama Android, iOS/iPadOS ve macOS hedeflerini; ilişkisel Drift/SQLite veri modelini; Excel/CSV importunu; rubrik ve hızlı ölçek değerlendirmelerini; telefon ve geniş ekran puanlama akışlarını; sonuç ekranlarını; PDF/XLSX/CSV exportunu; yazdırma/paylaşmayı; şifreli backup/restore'u; onboarding'i; tema ayarlarını; demo verisini ve hazır rubrik şablonlarını içerir.
 
-Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerinde `build_runner`, `flutter analyze`, `flutter test`, Android APK/AAB, unsigned iOS release ve macOS release buildlerini çalıştırır. Aynı kapı artık `main` pushlarının yanında `main` hedefli pull requestlerde de çalışır.
+Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerinde `build_runner`, `flutter analyze`, `flutter test`, Android APK/AAB, unsigned iOS release ve macOS release buildlerini çalıştırır. Aynı kapı `main` pushlarında ve `main` hedefli pull requestlerde çalışır.
 
 ### Faz durumları
 
 | Faz | Durum | Kalan ana iş |
 |---|---|---|
 | 0 — Teknik temel | **DONE** | — |
-| 1 — Sınıf/öğrenci | **PARTIAL** | eğitim yılı edit/archive polish |
+| 1 — Sınıf/öğrenci | **DONE** | — |
 | 2 — Assessment domain | **DONE** | — |
 | 3 — Hızlı değerlendirme | **DONE** | toplu puanlama yalnız beta ihtiyacı doğrulanırsa opsiyonel |
 | 4 — Rubrik oluşturucu | **DONE** | — |
 | 5 — Sonuç/analiz | **DONE** | — |
 | 6 — PDF/Excel/Print | **DONE** | export regression coverage sürekli korunmalı |
 | 7 — Backup/Restore | **DONE** | — |
-| 8 — Ürün UX | **PARTIAL** | erişilebilirlik/font-scaling cihaz doğrulaması |
-| 9 — Güvenilirlik | **PARTIAL** | platform UI/widget coverage genişletilmeli |
+| 8 — Ürün UX | **PARTIAL** | gerçek cihaz VoiceOver/TalkBack + büyük yazı/orientation acceptance |
+| 9 — Güvenilirlik | **PARTIAL** | platform widget/UI kapsamı gerektiğinde genişletilmeli |
 | 10 — Gerçek öğretmen beta | **BLOCKED/EXTERNAL** | gerçek beta oturumları ve PASS kanıtı |
 | 11 — Store/dağıtım | **BLOCKED/EXTERNAL** | signing, TestFlight, Play internal/closed testing, notarization |
 | 12 — Ticari katman | **NOT STARTED BY DESIGN** | Faz 10 doğrulanmadan başlanmaz |
@@ -49,10 +49,15 @@ Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerin
 
 ## Faz 1 — Sınıf ve öğrenci yönetimi
 
-**Durum: PARTIAL**
+**Durum: DONE**
 
 ### Tamamlanan
 - `SchoolYear → Course → Classroom → Student` ilişkisel modeli
+- Eğitim yılı oluşturma, düzenleme, aktif yıl seçme, arşivleme ve geri yükleme
+- Aktif eğitim yılını arşivlemeyi DAO/domain sınırında bloklama
+- Arşivlenen eğitim yılını mevcut Arşivler ekranından geri yükleme
+- Eğitim yılı arşivinden sonra Sınıflar ekranındaki stale `selectedYearId` değerini güvenli fallback ile toparlama
+- Eğitim yılı etiket/tarih doğrulaması ve tarih seçici sınırlarının güvenli tutulması
 - Sınıf oluşturma/düzenleme/arşivleme
 - Manuel öğrenci CRUD ve arşivleme
 - Excel/CSV import
@@ -63,12 +68,10 @@ Veritabanı şeması **v6**'dır. Release kalite kapısı GitHub Actions üzerin
 - Önizleme sonrası yarış durumuna karşı write transaction içinde conflict'i yeniden doğrulama
 - Conflict olduğunda sessiz overwrite yerine güvenli bloklama
 - Transaction/batch ile toplu yazma ve conflict halinde sıfır partial insert
-
-### Kalan
-- Eğitim yılı düzenleme/arşivleme UX'ini tamamlamak
+- Eğitim yılı edit/archive invariant regression testleri
 
 ### Çıkış kriteri
-30–40 öğrencilik gerçek sınıf birkaç dakika içinde güvenli biçimde oluşturulabilmeli; conflict sonucu kullanıcıya import başlamadan önce açıkça gösterilmeli ve stale preview durumunda write path aynı invariantı yeniden doğrulamalıdır.
+30–40 öğrencilik gerçek sınıf birkaç dakika içinde güvenli biçimde oluşturulabilmeli; import conflict sonucu kullanıcıya kayıt başlamadan önce açıkça gösterilmeli; stale preview durumunda write path aynı invariantı yeniden doğrulamalı; eğitim yılı yaşam döngüsü veri kaybı yaratmadan yönetilebilmelidir.
 
 ---
 
@@ -106,7 +109,7 @@ Assessment oluşturulurken rubrik snapshot'ı alınır; evaluation kayıtları s
 - Tablet/macOS için gradebook görünümü
 - Otomatik kayıt
 - Önceki/sonraki öğrenci
-- notStarted/incomplete/completed durumları
+- `notStarted / incomplete / completed` durumları
 - Değerlendirilmeyen/eksik filtreleri
 - Kriter notu, öğrenci notu ve zaman damgalı gözlem
 - Geniş ekran gradebook score hücreleri için gerçek focus hedefleri
@@ -165,7 +168,7 @@ Assessment oluşturulurken rubrik snapshot'ı alınır; evaluation kayıtları s
 5. Sistem yazdırma/paylaşma akışları
 
 ### Kalite kapısı
-Export regression testleri şu invariants'ı korur:
+Export regression testleri şu invariantları korur:
 - öğrenci/kriter eşleşmesi
 - toplam ve durum alanları
 - kriter/öğretmen/gözlem notları
@@ -206,7 +209,7 @@ Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı
 
 ## Faz 8 — Ürün UX'i
 
-**Durum: PARTIAL**
+**Durum: PARTIAL — otomatik erişilebilirlik kapıları hazır, gerçek cihaz kabulü bekliyor**
 
 ### Tamamlanan
 - Onboarding
@@ -217,12 +220,25 @@ Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı
 - Archive/Undo yaklaşımı
 - Temel semantic label kullanımı
 - Geniş ekran gradebook keyboard focus/shortcut desteği
+- Material tap target davranışını `padded` tutma
+- `IconButton` ve `TextButton` için minimum 48 × 48 dp etkileşim hedefi
+- Filled/Outlined ana aksiyonlarda minimum 48 dp yükseklik
+- Gradebook header ve satır geometrisini sistem `TextScaler` değerine göre büyütme
+- Frozen öğrenci sütunu ile score grid'i aynı dinamik satır yüksekliğinde tutma
+- Kriter notu aksiyonundaki lokal `VisualDensity.compact` küçültmesini kaldırma
+- 2× sistem yazısı ve minimum touch target regression testleri
+- `ACCESSIBILITY_CHECKLIST.md` ile otomatik ve manuel acceptance kapılarını ayırma
 
-### Kalan
-- VoiceOver/TalkBack gerçek cihaz doğrulaması
-- büyük font/font scaling kontrolü
-- minimum touch target audit'i
-- tablet landscape ve macOS pencere boyutu regresyonları
+### Kalan — gerçek cihaz/manual gate
+- VoiceOver ile gerçek iPhone/iPad doğrulaması
+- TalkBack ile gerçek Android doğrulaması
+- Sistem büyük yazı/font scaling matrisi
+- Tablet landscape kontrolü
+- macOS dar/geniş pencere boyutu acceptance turu
+- Focus sırası, semantic okuma sırası ve kritik aksiyonların ekran okuyucuyla kullanılabilirliği
+
+### Çıkış kriteri
+CI layout/touch-target regressionları yeşil olmalı ve gerçek cihaz acceptance checklist'i kritik hata olmadan tamamlanmalıdır. CI yeşili ekran okuyucu gerçek cihaz PASS yerine geçmez.
 
 ---
 
@@ -240,6 +256,9 @@ Ayrıca restore ortasında hata oluşursa önceki DB'nin değişmeden kaldığı
 - Failed restore atomic rollback testi
 - PDF/CSV/XLSX regression testleri
 - Gradebook keyboard command/grid-boundary regression testleri
+- Accessibility text-scale/touch-target regression testleri
+- Eğitim yılı edit/archive/restore invariant testleri
+- Responsive breakpoint sınır testleri
 - Kritik entegrasyon zinciri:
 
 ```text
@@ -255,8 +274,7 @@ CSV import
 ```
 
 ### Kalan
-- Telefon/tablet/macOS widget/UI test kapsamını genişletmek
-- Accessibility/font scaling testlerini otomasyona uygun yerlerde eklemek
+- Gerçek beta bulgularına göre telefon/tablet/macOS widget/UI kapsamını gerektiğinde genişletmek
 - Yeni export ve migration değişikliklerinde regression test zorunluluğunu sürdürmek
 
 ### Çıkış kriteri
@@ -348,7 +366,7 @@ Tercih edilen yön: local-first premium uygulama. Fiyat ve paket sınırları ge
 # Güncel çalışma sırası
 
 ```text
-1. Accessibility + font scaling audit/test
+1. VoiceOver/TalkBack + gerçek cihaz font-scaling/orientation acceptance
 ↓
 2. Gerçek öğretmen beta
 ↓
@@ -365,6 +383,6 @@ Tercih edilen yön: local-first premium uygulama. Fiyat ve paket sınırları ge
 
 ## Yol haritası kuralı
 
-Migration, backup/restore, değerlendirme veri bütünlüğü ve yanlış öğrenciye/sınıfa veri bağlanması hiçbir zaman “sonra bakılacak” teknik borç kabul edilmez. Dış doğrulama gerektiren beta ve signing maddeleri, sentetik veri veya doküman varlığıyla tamamlanmış işaretlenemez.
+Migration, backup/restore, değerlendirme veri bütünlüğü ve yanlış öğrenciye/sınıfa veri bağlanması hiçbir zaman “sonra bakılacak” teknik borç kabul edilmez. Dış doğrulama gerektiren beta, erişilebilirlik cihaz acceptance'ı ve signing maddeleri sentetik veri, CI yeşili veya doküman varlığıyla tamamlanmış işaretlenemez.
 
 Kapsam sınırları için bkz. [`PRODUCT_SCOPE.md`](PRODUCT_SCOPE.md).

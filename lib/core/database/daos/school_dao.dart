@@ -18,6 +18,12 @@ class SchoolDao extends DatabaseAccessor<AppDatabase> with _$SchoolDaoMixin {
     return query.watch();
   }
 
+  Stream<List<SchoolYear>> watchArchivedSchoolYears() =>
+      (select(schoolYears)
+            ..where((row) => row.archived.equals(true))
+            ..orderBy([(row) => OrderingTerm.desc(row.startsAt)]))
+          .watch();
+
   Future<SchoolYear?> activeSchoolYear() =>
       (select(schoolYears)..where((row) => row.isActive.equals(true))).getSingleOrNull();
 
@@ -29,9 +35,11 @@ class SchoolDao extends DatabaseAccessor<AppDatabase> with _$SchoolDaoMixin {
     required DateTime endsAt,
     bool makeActive = false,
   }) async {
-    final normalizedLabel = label.trim();
-    if (normalizedLabel.isEmpty) throw ArgumentError('Eğitim yılı etiketi boş olamaz.');
-    if (!endsAt.isAfter(startsAt)) throw ArgumentError('Eğitim yılı bitiş tarihi başlangıçtan sonra olmalıdır.');
+    final normalizedLabel = _validateSchoolYear(
+      label: label,
+      startsAt: startsAt,
+      endsAt: endsAt,
+    );
 
     return transaction(() async {
       if (makeActive) {
@@ -48,14 +56,69 @@ class SchoolDao extends DatabaseAccessor<AppDatabase> with _$SchoolDaoMixin {
     });
   }
 
+  Future<void> updateSchoolYear({
+    required int id,
+    required String label,
+    required DateTime startsAt,
+    required DateTime endsAt,
+  }) async {
+    final normalizedLabel = _validateSchoolYear(
+      label: label,
+      startsAt: startsAt,
+      endsAt: endsAt,
+    );
+    final target = await (select(schoolYears)..where((row) => row.id.equals(id))).getSingleOrNull();
+    if (target == null) throw StateError('Eğitim yılı bulunamadı.');
+    if (target.archived) {
+      throw StateError('Arşivlenmiş eğitim yılı düzenlenmeden önce geri yüklenmelidir.');
+    }
+    await (update(schoolYears)..where((row) => row.id.equals(id))).write(
+      SchoolYearsCompanion(
+        label: Value(normalizedLabel),
+        startsAt: Value(startsAt),
+        endsAt: Value(endsAt),
+      ),
+    );
+  }
+
   Future<void> setActiveSchoolYear(int id) async {
     await transaction(() async {
       final target = await (select(schoolYears)..where((row) => row.id.equals(id))).getSingleOrNull();
-      if (target == null || target.archived) throw StateError('Eğitim yılı bulunamadı veya arşivlenmiş.');
+      if (target == null || target.archived) {
+        throw StateError('Eğitim yılı bulunamadı veya arşivlenmiş.');
+      }
       await update(schoolYears).write(const SchoolYearsCompanion(isActive: Value(false)));
       await (update(schoolYears)..where((row) => row.id.equals(id)))
           .write(const SchoolYearsCompanion(isActive: Value(true)));
     });
+  }
+
+  Future<void> setSchoolYearArchived(int id, bool archived) async {
+    await transaction(() async {
+      final target = await (select(schoolYears)..where((row) => row.id.equals(id))).getSingleOrNull();
+      if (target == null) throw StateError('Eğitim yılı bulunamadı.');
+      if (archived && target.isActive) {
+        throw StateError('Aktif eğitim yılı arşivlenemez. Önce başka bir eğitim yılını aktif yapın.');
+      }
+      await (update(schoolYears)..where((row) => row.id.equals(id))).write(
+        SchoolYearsCompanion(archived: Value(archived)),
+      );
+    });
+  }
+
+  String _validateSchoolYear({
+    required String label,
+    required DateTime startsAt,
+    required DateTime endsAt,
+  }) {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isEmpty) {
+      throw ArgumentError('Eğitim yılı etiketi boş olamaz.');
+    }
+    if (!endsAt.isAfter(startsAt)) {
+      throw ArgumentError('Eğitim yılı bitiş tarihi başlangıçtan sonra olmalıdır.');
+    }
+    return normalizedLabel;
   }
 
   Stream<List<ClassroomSummaryRow>> watchClassrooms({int? schoolYearId, bool archived = false}) {

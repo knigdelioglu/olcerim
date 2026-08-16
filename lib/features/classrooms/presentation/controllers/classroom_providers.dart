@@ -16,6 +16,10 @@ final schoolYearsProvider = StreamProvider<List<SchoolYear>>((ref) {
   return ref.watch(classroomRepositoryProvider).watchSchoolYears();
 });
 
+final archivedSchoolYearsProvider = StreamProvider<List<SchoolYear>>((ref) {
+  return ref.watch(classroomRepositoryProvider).watchArchivedSchoolYears();
+});
+
 final classroomsProvider = StreamProvider.family<List<ClassroomSummaryRow>, int?>((ref, schoolYearId) {
   return ref.watch(classroomRepositoryProvider).watchClassrooms(schoolYearId: schoolYearId);
 });

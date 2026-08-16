@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:olcerim/core/database/app_database.dart';
 import 'package:olcerim/features/classrooms/presentation/controllers/classroom_providers.dart';
 
 class SchoolYearsView extends ConsumerWidget {
@@ -33,15 +34,36 @@ class SchoolYearsView extends ConsumerWidget {
                     subtitle: Text(
                       '${DateFormat('d MMM y', 'tr').format(year.startsAt)} – ${DateFormat('d MMM y', 'tr').format(year.endsAt)}',
                     ),
-                    trailing: year.isActive
-                        ? const Chip(label: Text('Aktif'))
-                        : TextButton(
-                            onPressed: () async {
-                              await ref.read(classroomRepositoryProvider).setActiveSchoolYear(year.id);
-                              ref.invalidate(activeSchoolYearProvider);
-                            },
-                            child: const Text('Aktif yap'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (year.isActive) const Chip(label: Text('Aktif')),
+                        PopupMenuButton<String>(
+                          tooltip: 'Eğitim yılı işlemleri',
+                          onSelected: (value) => _handleAction(
+                            context: context,
+                            ref: ref,
+                            year: year,
+                            action: value,
                           ),
+                          itemBuilder: (_) => [
+                            if (!year.isActive)
+                              const PopupMenuItem(
+                                value: 'activate',
+                                child: Text('Aktif yap'),
+                              ),
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Düzenle'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'archive',
+                              child: Text('Arşivle'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -51,19 +73,183 @@ class SchoolYearsView extends ConsumerWidget {
     );
   }
 
+  Future<void> _handleAction({
+    required BuildContext context,
+    required WidgetRef ref,
+    required SchoolYear year,
+    required String action,
+  }) async {
+    switch (action) {
+      case 'activate':
+        try {
+          await ref.read(classroomRepositoryProvider).setActiveSchoolYear(year.id);
+          ref.invalidate(activeSchoolYearProvider);
+        } catch (_) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Eğitim yılı aktif yapılamadı.')),
+            );
+          }
+        }
+        return;
+      case 'edit':
+        await _editYear(context, ref, year);
+        return;
+      case 'archive':
+        await _archiveYear(context, ref, year);
+        return;
+    }
+  }
+
   Future<void> _createYear(BuildContext context, WidgetRef ref) async {
     final now = DateTime.now();
-    final startYear = now.month >= 8 ? now.year + 1 : now.year;
-    final label = TextEditingController(text: '$startYear–${startYear + 1}');
-    var startsAt = DateTime(startYear, 9, 1);
-    var endsAt = DateTime(startYear + 1, 8, 31);
+    final startYear = now.month >= 8 ? now.year : now.year - 1;
+    final draft = await _showYearDialog(
+      context: context,
+      title: 'Yeni eğitim yılı',
+      actionLabel: 'Oluştur',
+      initialLabel: '$startYear–${startYear + 1}',
+      initialStartsAt: DateTime(startYear, 9, 1),
+      initialEndsAt: DateTime(startYear + 1, 8, 31),
+      allowMakeActive: true,
+    );
+    if (draft == null) return;
+
+    try {
+      await ref.read(classroomRepositoryProvider).createSchoolYear(
+            label: draft.label,
+            startsAt: draft.startsAt,
+            endsAt: draft.endsAt,
+            makeActive: draft.makeActive,
+          );
+      if (draft.makeActive) ref.invalidate(activeSchoolYearProvider);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Eğitim yılı oluşturulamadı. Etiketi ve tarih aralığını kontrol edin.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editYear(
+    BuildContext context,
+    WidgetRef ref,
+    SchoolYear year,
+  ) async {
+    final draft = await _showYearDialog(
+      context: context,
+      title: 'Eğitim yılını düzenle',
+      actionLabel: 'Kaydet',
+      initialLabel: year.label,
+      initialStartsAt: year.startsAt,
+      initialEndsAt: year.endsAt,
+    );
+    if (draft == null) return;
+
+    try {
+      await ref.read(classroomRepositoryProvider).updateSchoolYear(
+            id: year.id,
+            label: draft.label,
+            startsAt: draft.startsAt,
+            endsAt: draft.endsAt,
+          );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Eğitim yılı güncellenemedi. Etiketi ve tarih aralığını kontrol edin.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _archiveYear(
+    BuildContext context,
+    WidgetRef ref,
+    SchoolYear year,
+  ) async {
+    if (year.isActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Aktif eğitim yılı arşivlenemez. Önce başka bir eğitim yılını aktif yapın.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eğitim yılını arşivle'),
+        content: Text(
+          '${year.label} eğitim yılı aktif listeden kaldırılacak. İlişkili veriler silinmez.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('İptal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Arşivle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref.read(classroomRepositoryProvider).setSchoolYearArchived(year.id, true);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${year.label} arşivlendi.'),
+          action: SnackBarAction(
+            label: 'Geri al',
+            onPressed: () => ref
+                .read(classroomRepositoryProvider)
+                .setSchoolYearArchived(year.id, false),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Eğitim yılı arşivlenemedi.')),
+        );
+      }
+    }
+  }
+
+  Future<_SchoolYearDraft?> _showYearDialog({
+    required BuildContext context,
+    required String title,
+    required String actionLabel,
+    required String initialLabel,
+    required DateTime initialStartsAt,
+    required DateTime initialEndsAt,
+    bool allowMakeActive = false,
+  }) async {
+    final label = TextEditingController(text: initialLabel);
+    var startsAt = initialStartsAt;
+    var endsAt = initialEndsAt;
     var makeActive = false;
 
-    final create = await showDialog<bool>(
+    final result = await showDialog<_SchoolYearDraft>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setLocalState) => AlertDialog(
-          title: const Text('Yeni eğitim yılı'),
+          title: Text(title),
           content: SizedBox(
             width: 440,
             child: Column(
@@ -71,7 +257,10 @@ class SchoolYearsView extends ConsumerWidget {
               children: [
                 TextField(
                   controller: label,
-                  decoration: const InputDecoration(labelText: 'Etiket', hintText: '2027–2028'),
+                  decoration: const InputDecoration(
+                    labelText: 'Etiket',
+                    hintText: '2026–2027',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ListTile(
@@ -83,8 +272,8 @@ class SchoolYearsView extends ConsumerWidget {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: startsAt,
-                      firstDate: DateTime(startYear - 2),
-                      lastDate: DateTime(startYear + 3),
+                      firstDate: DateTime(startsAt.year - 5),
+                      lastDate: DateTime(endsAt.year + 5, 12, 31),
                     );
                     if (picked != null) setLocalState(() => startsAt = picked);
                   },
@@ -98,52 +287,58 @@ class SchoolYearsView extends ConsumerWidget {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: endsAt,
-                      firstDate: startsAt,
-                      lastDate: DateTime(startYear + 4),
+                      firstDate: DateTime(endsAt.year - 5),
+                      lastDate: DateTime(endsAt.year + 5, 12, 31),
                     );
                     if (picked != null) setLocalState(() => endsAt = picked);
                   },
                 ),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: makeActive,
-                  onChanged: (value) => setLocalState(() => makeActive = value ?? false),
-                  title: const Text('Oluşturunca aktif eğitim yılı yap'),
-                ),
+                if (allowMakeActive)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: makeActive,
+                    onChanged: (value) => setLocalState(() => makeActive = value ?? false),
+                    title: const Text('Oluşturunca aktif eğitim yılı yap'),
+                  ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('İptal')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
             FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Oluştur'),
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                _SchoolYearDraft(
+                  label: label.text,
+                  startsAt: startsAt,
+                  endsAt: endsAt,
+                  makeActive: makeActive,
+                ),
+              ),
+              child: Text(actionLabel),
             ),
           ],
         ),
       ),
     );
-
-    if (create != true) {
-      label.dispose();
-      return;
-    }
-    try {
-      await ref.read(classroomRepositoryProvider).createSchoolYear(
-            label: label.text,
-            startsAt: startsAt,
-            endsAt: endsAt,
-            makeActive: makeActive,
-          );
-      if (makeActive) ref.invalidate(activeSchoolYearProvider);
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Eğitim yılı oluşturulamadı. Etiket daha önce kullanılmış olabilir.')),
-        );
-      }
-    } finally {
-      label.dispose();
-    }
+    label.dispose();
+    return result;
   }
+}
+
+class _SchoolYearDraft {
+  const _SchoolYearDraft({
+    required this.label,
+    required this.startsAt,
+    required this.endsAt,
+    required this.makeActive,
+  });
+
+  final String label;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final bool makeActive;
 }
