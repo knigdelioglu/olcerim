@@ -8,6 +8,7 @@ Repo artık mimari iskelet değil çalışan 1.0 ürün adayıdır. Güncel uygu
 
 - Eğitim yılı, ders, sınıf ve öğrenci yönetimi
 - Manuel öğrenci CRUD + Excel/CSV import
+- Import önizlemesinde dosya içi ve mevcut sınıf okul numarası conflict kontrolü
 - Rubrik ve hızlı derecelendirme assessment tipleri
 - Rubrik editörü, performans seviyeleri ve şablon tekrar kullanımı
 - Telefon için ardışık öğrenci puanlama, tablet/macOS için gradebook
@@ -98,7 +99,7 @@ app_settings
 Temel bütünlük kuralları:
 
 - `Student` bir `Classroom`a bağlıdır.
-- Aynı sınıfta aynı okul numarası duplicate olamaz.
+- Aynı sınıfta aynı okul numarası duplicate olamaz; archive durumu bu uniqueness invariantını kaldırmaz.
 - Assessment oluşturulurken kullanılan rubrik snapshot olarak kopyalanır; sonradan template değişikliği eski değerlendirmeyi bozmaz.
 - `Evaluation`, assessment + student çiftini temsil eder.
 - `EvaluationEntry`, evaluation + criterion için tek canonical puan kaydıdır.
@@ -113,12 +114,22 @@ Dosya seç
 → byte'ları al
 → UI isolate dışında parse et
 → kolonları algıla
-→ önizle + doğrula
+→ dosya içi validation
+→ mevcut sınıf conflict preflight
+→ önizle
+→ write transaction içinde conflict'i yeniden doğrula
 → tek transaction/batch ile yaz
 → Drift stream üzerinden UI'ı yenile
 ```
 
-Dosya içindeki duplicate okul numaraları ve boş öğrenci adları import başlamadan raporlanır. Mevcut sınıftaki kayıtlarla conflict preflight'i roadmap'teki sıradaki UX/data işlerinden biridir.
+Import güvenliği:
+
+- Dosya içindeki duplicate okul numaraları ve boş öğrenci adları import başlamadan raporlanır.
+- Seçili sınıfta aynı okul numarasına sahip aktif **veya arşivlenmiş** öğrenci varsa ilgili CSV/Excel satırı, okul numarası ve mevcut öğrenci adı önizlemede gösterilir.
+- Conflict kayıtları sessizce overwrite edilmez.
+- Preview ile kayıt arasındaki sürede sınıf değişmiş olabileceği için DAO aynı kontrolü write transaction içinde tekrarlar.
+- Transaction seviyesinde conflict bulunursa hiçbir yeni öğrenci satırı yazılmaz.
+- Aynı okul numarası farklı bir sınıfta kullanılabilir; invariant sınıf + okul numarası çiftidir.
 
 ## Değerlendirme akışı
 
@@ -206,7 +217,15 @@ CSV import
 → sonuç ve FK bütünlüğünü tekrar doğrula
 ```
 
-Export regression testleri CSV/XLSX mantıksal eşitliğini, Türkçe karakterleri, not/gözlem alanlarını, completed/incomplete durumlarını ve öğrencisiz assessment çıktısını korur.
+Ek regression testleri:
+
+- CSV/XLSX mantıksal içerik eşitliği
+- Türkçe karakterler
+- kriter/öğretmen/gözlem notları
+- completed/incomplete sonuçlar
+- öğrencisiz assessment exportu
+- aktif/arşivlenmiş student import conflict preflight
+- stale preview conflictinde transaction rollback
 
 ## Platform runnerları ve yerel çalıştırma
 
@@ -257,12 +276,10 @@ Gerçek öğrenci adı, okul numarası, değerlendirme notu, SQLite dosyası, ba
 
 Güncel sıra `docs/ROADMAP.md` ile yönetilir. Kısa özet:
 
-1. Export regression coverage'ı koru ve genişlet
-2. Existing-duplicate import preflight
-3. macOS/tablet keyboard grading polish
-4. Accessibility/font scaling audit
-5. Gerçek öğretmen beta
-6. Beta P0/P1 düzeltmeleri
-7. Final app icon + gerçek store screenshotları
-8. Apple/Google signing ve internal testing
-9. Beta sonrası ticari/IAP kararı
+1. macOS/tablet keyboard grading polish
+2. Accessibility/font scaling audit
+3. Gerçek öğretmen beta
+4. Beta P0/P1 düzeltmeleri
+5. Final app icon + gerçek store screenshotları
+6. Apple/Google signing ve internal testing
+7. Beta sonrası ticari/IAP kararı
