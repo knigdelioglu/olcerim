@@ -239,31 +239,43 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _repairEvaluationStatuses() async {
     await customStatement('''
+      WITH
+      entry_counts AS (
+        SELECT evaluation_id, COUNT(*) AS entry_count
+        FROM evaluation_entries
+        GROUP BY evaluation_id
+      ),
+      criterion_counts AS (
+        SELECT a.id AS assessment_id, COUNT(rc.id) AS criterion_count
+        FROM assessments a
+        LEFT JOIN rubric_criteria rc ON rc.rubric_id = a.rubric_id
+        GROUP BY a.id
+      ),
+      desired_status AS (
+        SELECT
+          e.id AS evaluation_id,
+          CASE
+            WHEN COALESCE(ec.entry_count, 0) = 0 THEN 'notStarted'
+            WHEN COALESCE(cc.criterion_count, 0) > 0
+              AND COALESCE(ec.entry_count, 0) >= cc.criterion_count THEN 'completed'
+            ELSE 'incomplete'
+          END AS status
+        FROM evaluations e
+        LEFT JOIN entry_counts ec ON ec.evaluation_id = e.id
+        LEFT JOIN criterion_counts cc ON cc.assessment_id = e.assessment_id
+      )
       UPDATE evaluations
-      SET status = CASE
-        WHEN (
-          SELECT COUNT(*)
-          FROM evaluation_entries ee
-          WHERE ee.evaluation_id = evaluations.id
-        ) = 0 THEN 'notStarted'
-        WHEN (
-          SELECT COUNT(*)
-          FROM rubric_criteria rc
-          JOIN assessments a ON a.rubric_id = rc.rubric_id
-          WHERE a.id = evaluations.assessment_id
-        ) > 0
-        AND (
-          SELECT COUNT(*)
-          FROM evaluation_entries ee
-          WHERE ee.evaluation_id = evaluations.id
-        ) >= (
-          SELECT COUNT(*)
-          FROM rubric_criteria rc
-          JOIN assessments a ON a.rubric_id = rc.rubric_id
-          WHERE a.id = evaluations.assessment_id
-        ) THEN 'completed'
-        ELSE 'incomplete'
-      END
+      SET status = (
+        SELECT ds.status
+        FROM desired_status ds
+        WHERE ds.evaluation_id = evaluations.id
+      )
+      WHERE EXISTS (
+        SELECT 1
+        FROM desired_status ds
+        WHERE ds.evaluation_id = evaluations.id
+          AND ds.status <> evaluations.status
+      )
     ''');
   }
 
