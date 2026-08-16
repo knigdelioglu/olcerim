@@ -11,14 +11,26 @@ Bu belge Faz 10'un dış kullanıcı doğrulama protokolüdür. Bu repodaki demo
 - En az 5 öğretmen.
 - Mümkünse en az 2 farklı branş.
 - En az bir telefon, bir tablet ve bir Mac kullanım oturumu.
-- Katılımcıların gerçek öğrenci verisi kullanması zorunlu değildir; `test/fixtures/beta_students.csv` veya uygulamadaki sentetik demo kullanılabilir.
+- Katılımcıların gerçek öğrenci verisi kullanması zorunlu değildir; `test/fixtures/beta_students.csv` veya uygulamadaki **30 öğrencilik sentetik demo workspace** kullanılabilir.
+
+## Demo fixture kontratı
+
+Uygulamadaki demo workspace beta akışını gerçek öğrenci verisi olmadan başlatmak için şu minimum yapıyı üretir:
+
+- 30 sentetik öğrenci (`101`–`130` okul numaraları)
+- 5 kriterli, toplam 100 puanlık `Sözlü Sunum Demo` rubriği
+- her kriter için 4 performans seviyesi
+- 30 öğrenci için başlangıçta puanlanmamış evaluation kayıtları
+- `Demo Sözlü Sunum` değerlendirmesi
+
+Bu kontrat `test/features/demo/demo_repository_test.dart` ile korunur. Demo fixture kullanmak gerçek öğretmen beta kanıtı yerine geçmez; yalnız gerçek öğrenci verisi kullanma zorunluluğunu kaldırır.
 
 ## Zorunlu görevler
 
-1. İlk sınıfı oluştur.
-2. 30 öğrencilik CSV'yi içe aktar.
-3. 5 kriterli bir rubrik oluştur.
-4. Yeni değerlendirme oluştur.
+1. İlk sınıfı oluştur veya 30 öğrencilik sentetik demo workspace'i aç.
+2. Import akışı test edilecekse 30 öğrencilik CSV'yi içe aktar.
+3. 5 kriterli bir rubrik oluştur veya demo rubriğini incele.
+4. Yeni değerlendirme oluştur veya demo değerlendirmesini aç.
 5. En az 10 öğrenciyi puanla.
 6. Önceki bir öğrencinin puanını değiştir.
 7. Sınıf sonucunu aç ve kriter ortalamalarını bul.
@@ -28,6 +40,8 @@ Bu belge Faz 10'un dış kullanıcı doğrulama protokolüdür. Bu repodaki demo
 11. Şifreli yedek oluştur.
 12. Yedeği geri yükleme önizlemesine kadar aç; metadata'yı doğrula.
 13. Ayrı test cihazında/temiz test kurulumunda restore'u tamamla.
+
+> Import UX'i beta kapsamında değerlendirilecekse demo workspace tek başına yeterli değildir; görev 1–4 yerine sınıf oluşturma + `test/fixtures/beta_students.csv` importu + rubrik/değerlendirme oluşturma akışı uygulanmalıdır.
 
 ## Her görev için kayıt
 
