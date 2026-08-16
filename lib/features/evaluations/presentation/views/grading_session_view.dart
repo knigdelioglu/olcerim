@@ -7,6 +7,7 @@ import 'package:olcerim/core/database/app_database.dart';
 import 'package:olcerim/core/database/daos/evaluation_dao.dart';
 import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
 import 'package:olcerim/features/evaluations/presentation/controllers/evaluation_providers.dart';
+import 'package:olcerim/features/evaluations/presentation/gradebook_keyboard_navigation.dart';
 import 'package:olcerim/features/evaluations/presentation/views/assessment_results_view.dart';
 import 'package:olcerim/features/evaluations/presentation/views/evaluation_notes_sheet.dart';
 import 'package:olcerim/features/evaluations/presentation/views/score_picker.dart';
@@ -94,7 +95,6 @@ class _GradingSessionViewState extends ConsumerState<GradingSessionView> {
                       onNoteChanged: _saveNoteDebounced,
                     )
                   : _Gradebook(
-                      assessmentId: widget.assessmentId,
                       students: visible,
                       criteria: criteriaItems,
                       filter: filter,
@@ -374,16 +374,15 @@ class _CriterionCard extends StatelessWidget {
   }
 }
 
-class _Gradebook extends ConsumerWidget {
+class _Gradebook extends ConsumerStatefulWidget {
   const _Gradebook({
-    required this.assessmentId,
     required this.students,
     required this.criteria,
     required this.filter,
     required this.onFilter,
     required this.onSaving,
   });
-  final int assessmentId;
+
   final List<EvaluationStudentRow> students;
   final List<RubricCriterion> criteria;
   final String filter;
@@ -391,7 +390,77 @@ class _Gradebook extends ConsumerWidget {
   final ValueChanged<bool> onSaving;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Gradebook> createState() => _GradebookState();
+}
+
+class _GradebookState extends ConsumerState<_Gradebook> {
+  final Map<String, FocusNode> _focusNodes = {};
+
+  @override
+  void didUpdateWidget(covariant _Gradebook oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _pruneFocusNodes();
+  }
+
+  @override
+  void dispose() {
+    for (final node in _focusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  String _cellKey(int rowIndex, int columnIndex) =>
+      '${widget.students[rowIndex].evaluation.id}:${widget.criteria[columnIndex].id}';
+
+  FocusNode _focusNodeFor(int rowIndex, int columnIndex) {
+    final key = _cellKey(rowIndex, columnIndex);
+    return _focusNodes.putIfAbsent(
+      key,
+      () => FocusNode(debugLabel: 'gradebook-score-$key'),
+    );
+  }
+
+  void _pruneFocusNodes() {
+    final validKeys = <String>{
+      for (var row = 0; row < widget.students.length; row++)
+        for (var column = 0; column < widget.criteria.length; column++) _cellKey(row, column),
+    };
+    final staleKeys = _focusNodes.keys.where((key) => !validKeys.contains(key)).toList();
+    for (final key in staleKeys) {
+      _focusNodes.remove(key)?.dispose();
+    }
+  }
+
+  void _handleNavigation(
+    GradebookCellPosition current,
+    GradebookKeyboardCommand command,
+  ) {
+    final next = moveGradebookCell(
+      current: current,
+      command: command,
+      rowCount: widget.students.length,
+      columnCount: widget.criteria.length,
+    );
+    if (next == current) return;
+
+    final node = _focusNodeFor(next.row, next.column);
+    node.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final targetContext = node.context;
+      if (targetContext == null) return;
+      unawaited(
+        Scrollable.ensureVisible(
+          targetContext,
+          duration: const Duration(milliseconds: 120),
+          alignment: 0.5,
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     const nameWidth = 280.0;
     const cellWidth = 148.0;
     return Column(
@@ -400,8 +469,26 @@ class _Gradebook extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Expanded(child: Text('${students.length} öğrenci', style: Theme.of(context).textTheme.titleMedium)),
-              _FilterMenu(value: filter, onChanged: onFilter),
+              Expanded(
+                child: Text(
+                  '${widget.students.length} öğrenci',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              if (widget.criteria.isNotEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Tooltip(
+                    message:
+                        'Klavye: Tab ile puan hücresine geçin; ok tuşlarıyla hareket edin; '
+                        'Home/End ile satırın başına/sonuna gidin; Enter veya Space ile puanlayın.',
+                    child: Semantics(
+                      label: 'Klavye kısayolları bilgisi',
+                      child: Icon(Icons.keyboard_alt_outlined),
+                    ),
+                  ),
+                ),
+              _FilterMenu(value: widget.filter, onChanged: widget.onFilter),
             ],
           ),
         ),
@@ -422,7 +509,7 @@ class _Gradebook extends ConsumerWidget {
                           child: Align(alignment: Alignment.centerLeft, child: Text('Öğrenci')),
                         ),
                       ),
-                      ...students.map((row) => _StudentNameCell(row: row)),
+                      ...widget.students.map((row) => _StudentNameCell(row: row)),
                     ],
                   ),
                 ),
@@ -436,24 +523,36 @@ class _Gradebook extends ConsumerWidget {
                           height: 52,
                           child: Row(
                             children: [
-                              ...criteria.map(
-                                (c) => SizedBox(
+                              ...widget.criteria.map(
+                                (criterion) => SizedBox(
                                   width: cellWidth,
-                                  child: Center(child: Text(c.title, overflow: TextOverflow.ellipsis)),
+                                  child: Center(
+                                    child: Text(criterion.title, overflow: TextOverflow.ellipsis),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 100, child: Center(child: Text('Toplam'))),
                             ],
                           ),
                         ),
-                        ...students.map(
-                          (row) => _ScoreRow(
-                            row: row,
-                            criteria: criteria,
-                            cellWidth: cellWidth,
-                            onSaving: onSaving,
-                          ),
-                        ),
+                        ...widget.students.asMap().entries.map(
+                              (studentEntry) => _ScoreRow(
+                                rowIndex: studentEntry.key,
+                                row: studentEntry.value,
+                                criteria: widget.criteria,
+                                cellWidth: cellWidth,
+                                focusNodeFor: (columnIndex) =>
+                                    _focusNodeFor(studentEntry.key, columnIndex),
+                                onKeyboardCommand: (columnIndex, command) => _handleNavigation(
+                                  GradebookCellPosition(
+                                    row: studentEntry.key,
+                                    column: columnIndex,
+                                  ),
+                                  command,
+                                ),
+                                onSaving: widget.onSaving,
+                              ),
+                            ),
                       ],
                     ),
                   ),
@@ -504,14 +603,21 @@ class _StudentNameCell extends StatelessWidget {
 
 class _ScoreRow extends ConsumerWidget {
   const _ScoreRow({
+    required this.rowIndex,
     required this.row,
     required this.criteria,
     required this.cellWidth,
+    required this.focusNodeFor,
+    required this.onKeyboardCommand,
     required this.onSaving,
   });
+
+  final int rowIndex;
   final EvaluationStudentRow row;
   final List<RubricCriterion> criteria;
   final double cellWidth;
+  final FocusNode Function(int columnIndex) focusNodeFor;
+  final void Function(int columnIndex, GradebookKeyboardCommand command) onKeyboardCommand;
   final ValueChanged<bool> onSaving;
 
   @override
@@ -520,55 +626,70 @@ class _ScoreRow extends ConsumerWidget {
         const <EvaluationEntry>[];
     final byCriterion = {for (final entry in entries) entry.criterionId: entry};
     final total = entries.fold<double>(0, (sum, entry) => sum + entry.score);
+
+    Future<void> editScore(RubricCriterion criterion, double? score) async {
+      final levels = await ref.read(evaluationRepositoryProvider).levels(criterion.id);
+      if (!context.mounted) return;
+      final picked = await showDialog<double>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(criterion.title),
+          content: SizedBox(
+            width: 420,
+            child: ScorePicker(
+              criterion: criterion,
+              levels: levels,
+              currentScore: score,
+            ),
+          ),
+        ),
+      );
+      if (picked == null) return;
+      onSaving(true);
+      try {
+        await ref.read(evaluationRepositoryProvider).score(
+              evaluationId: row.evaluation.id,
+              criterionId: criterion.id,
+              score: picked,
+            );
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Puan kaydedilemedi. Tekrar deneyin.')),
+          );
+        }
+      } finally {
+        onSaving(false);
+      }
+    }
+
     return SizedBox(
       height: 64,
       child: Row(
         children: [
-          ...criteria.map((criterion) {
+          ...criteria.asMap().entries.map((criterionEntry) {
+            final columnIndex = criterionEntry.key;
+            final criterion = criterionEntry.value;
             final entry = byCriterion[criterion.id];
             final score = entry?.score;
+            final scoreText =
+                score?.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '') ?? '—';
             return SizedBox(
               width: cellWidth,
               child: Row(
                 children: [
                   Expanded(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () async {
-                        final levels = await ref.read(evaluationRepositoryProvider).levels(criterion.id);
-                        if (!context.mounted) return;
-                        final picked = await showDialog<double>(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: Text(criterion.title),
-                            content: SizedBox(
-                              width: 420,
-                              child: ScorePicker(
-                                criterion: criterion,
-                                levels: levels,
-                                currentScore: score,
-                              ),
-                            ),
-                          ),
-                        );
-                        if (picked == null) return;
-                        onSaving(true);
-                        try {
-                          await ref.read(evaluationRepositoryProvider).score(
-                                evaluationId: row.evaluation.id,
-                                criterionId: criterion.id,
-                                score: picked,
-                              );
-                        } finally {
-                          onSaving(false);
-                        }
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        child: Center(
-                          child: Text(score?.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '') ?? '—'),
-                        ),
+                    child: _KeyboardScoreCell(
+                      key: ValueKey(
+                        'gradebook-score-${row.evaluation.id}-${criterion.id}',
                       ),
+                      focusNode: focusNodeFor(columnIndex),
+                      semanticLabel:
+                          '${row.student.fullName}, ${criterion.title}, puan $scoreText. '
+                          'Ok tuşlarıyla hareket edin; Enter veya Space ile puanlayın.',
+                      scoreText: scoreText,
+                      onActivate: () => editScore(criterion, score),
+                      onCommand: (command) => onKeyboardCommand(columnIndex, command),
                     ),
                   ),
                   if (entry != null)
@@ -595,12 +716,79 @@ class _ScoreRow extends ConsumerWidget {
           }),
           SizedBox(
             width: 100,
-            child: Center(child: Text(total.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), ''))),
+            child: Center(
+              child: Text(total.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '')),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+class _KeyboardScoreCell extends StatelessWidget {
+  const _KeyboardScoreCell({
+    required this.focusNode,
+    required this.semanticLabel,
+    required this.scoreText,
+    required this.onActivate,
+    required this.onCommand,
+    super.key,
+  });
+
+  final FocusNode focusNode;
+  final String semanticLabel;
+  final String scoreText;
+  final Future<void> Function() onActivate;
+  final ValueChanged<GradebookKeyboardCommand> onCommand;
+
+  @override
+  Widget build(BuildContext context) => Focus(
+        focusNode: focusNode,
+        onKeyEvent: (_, event) {
+          final command = gradebookCommandForKeyEvent(event);
+          if (command == GradebookKeyboardCommand.none) {
+            return KeyEventResult.ignored;
+          }
+          if (command == GradebookKeyboardCommand.activate) {
+            unawaited(onActivate());
+          } else {
+            onCommand(command);
+          }
+          return KeyEventResult.handled;
+        },
+        child: Builder(
+          builder: (context) {
+            final focused = Focus.of(context).hasFocus;
+            final colorScheme = Theme.of(context).colorScheme;
+            return Semantics(
+              button: true,
+              focusable: true,
+              focused: focused,
+              label: semanticLabel,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 80),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: focused ? colorScheme.primary : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  canRequestFocus: false,
+                  onTap: () => unawaited(onActivate()),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    child: Center(child: Text(scoreText)),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      );
 }
 
 class _FilterMenu extends StatelessWidget {
