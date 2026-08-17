@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -21,7 +23,7 @@ class StudentResultView extends ConsumerWidget {
             onPressed: () async {
               final bytes = await ref.read(reportRepositoryProvider).studentPdf(results, student);
               if (!context.mounted) return;
-              Navigator.push(
+              unawaited(Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => GeneratedPdfView(
@@ -30,7 +32,7 @@ class StudentResultView extends ConsumerWidget {
                     fileName: 'ogrenci-degerlendirme.pdf',
                   ),
                 ),
-              );
+              ));
             },
             icon: const Icon(Icons.picture_as_pdf),
             label: const Text('PDF'),
