@@ -41,11 +41,13 @@ void main() {
       title: 'Ders içi hızlı değerlendirme',
       assessmentDate: DateTime(2026, 8, 16),
     );
-    final students = await db.evaluationDao.watchStudentsForAssessment(assessmentId).first;
+    final evaluationsList = await (db.select(db.evaluations)
+          ..where((row) => row.assessmentId.equals(assessmentId)))
+        .get();
     final criterion = (await db.evaluationDao.criteriaForAssessment(assessmentId)).single;
     return (
       assessmentId: assessmentId,
-      firstEvaluationId: students.first.evaluation.id,
+      firstEvaluationId: evaluationsList.first.id,
       criterionId: criterion.id,
     );
   }
@@ -54,12 +56,13 @@ void main() {
     WidgetTester tester, {
     required Size size,
     required int assessmentId,
+    required ProviderContainer container,
   }) async {
     await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp(
           home: GradingSessionView(assessmentId: assessmentId),
         ),
@@ -69,11 +72,20 @@ void main() {
   }
 
   testWidgets('phone renders sequential compact grading flow', (tester) async {
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await tester.pump(const Duration(milliseconds: 100));
+    });
+
     final data = await fixture();
     await pumpSession(
       tester,
       size: const Size(390, 844),
       assessmentId: data.assessmentId,
+      container: container,
     );
 
     expect(find.text('1 / 2'), findsOneWidget);
@@ -91,11 +103,20 @@ void main() {
   });
 
   testWidgets('tablet and desktop widths render the gradebook', (tester) async {
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await tester.pump(const Duration(milliseconds: 100));
+    });
+
     final data = await fixture();
     await pumpSession(
       tester,
       size: const Size(800, 1000),
       assessmentId: data.assessmentId,
+      container: container,
     );
 
     expect(find.text('2 öğrenci'), findsOneWidget);
@@ -128,11 +149,20 @@ void main() {
 
   testWidgets('resizing from phone to wide layout switches to gradebook without data loss',
       (tester) async {
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await tester.pump(const Duration(milliseconds: 100));
+    });
+
     final data = await fixture();
     await pumpSession(
       tester,
       size: const Size(390, 844),
       assessmentId: data.assessmentId,
+      container: container,
     );
 
     expect(find.text('Ada Öğrenci'), findsOneWidget);
