@@ -8,6 +8,10 @@ coverage/
 .flutter-plugins
 .flutter-plugins-dependencies
 **/doc/api/
+.metadata
+android/
+ios/
+macos/
 
 # Generated source (recreate with build_runner)
 **/*.g.dart

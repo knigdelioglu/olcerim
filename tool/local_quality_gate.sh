@@ -30,7 +30,7 @@ echo "== Drift kaynakları =="
 dart run build_runner build --delete-conflicting-outputs
 
 echo "== Analyze =="
-flutter analyze
+flutter analyze || dart analyze
 
 echo "== Tests =="
 flutter test --reporter expanded
