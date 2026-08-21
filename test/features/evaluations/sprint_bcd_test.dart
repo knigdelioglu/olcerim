@@ -60,6 +60,47 @@ void main() {
     expect(updated.evaluation.status, EvaluationStatus.completed.storageValue);
   });
 
+  test('0-100 quick scale uses one continuous criterion and canonical score validation', () async {
+    final classroomId = await createClassroom();
+    await db.studentDao.saveStudent(
+      classroomId: classroomId,
+      schoolNumber: '103',
+      fullName: 'Cem Öğrenci',
+    );
+
+    final assessmentId = await db.assessmentDao.createQuickScaleAssessment(
+      classroomId: classroomId,
+      preset: QuickScalePreset.numericHundred,
+      title: 'Hızlı not girişi',
+      assessmentDate: DateTime(2026, 8, 21),
+    );
+
+    final criterion = (await db.evaluationDao.criteriaForAssessment(assessmentId)).single;
+    expect(criterion.maxScore, 100);
+    expect(await db.evaluationDao.levelsForCriterion(criterion.id), isEmpty);
+
+    final evaluation =
+        (await db.evaluationDao.watchStudentsForAssessment(assessmentId).first).single.evaluation;
+    await db.evaluationDao.upsertScore(
+      evaluationId: evaluation.id,
+      criterionId: criterion.id,
+      score: 87,
+    );
+
+    final results = await db.evaluationDao.loadResults(assessmentId);
+    expect(results.students.single.total, 87);
+    expect(results.students.single.status, EvaluationStatus.completed.storageValue);
+
+    expect(
+      () => db.evaluationDao.upsertScore(
+        evaluationId: evaluation.id,
+        criterionId: criterion.id,
+        score: 101,
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('criterion notes and observations survive results and tabular export', () async {
     final classroomId = await createClassroom();
     await db.studentDao.saveStudent(
