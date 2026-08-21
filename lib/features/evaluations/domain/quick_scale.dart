@@ -4,14 +4,30 @@ class QuickScalePreset {
     required this.label,
     required this.description,
     required this.levels,
+    this.fixedMaxScore,
   });
 
   final String id;
   final String label;
   final String description;
   final List<QuickScaleLevelDefinition> levels;
+  final double? fixedMaxScore;
 
-  double get maxScore => levels.fold<double>(0, (max, level) => level.score > max ? level.score : max);
+  bool get usesNumericInput => levels.isEmpty;
+
+  double get maxScore => fixedMaxScore ??
+      levels.fold<double>(
+        0,
+        (max, level) => level.score > max ? level.score : max,
+      );
+
+  static const numericHundred = QuickScalePreset(
+    id: 'numeric-100',
+    label: '0–100',
+    description: 'Öğrenciye 0 ile 100 arasında doğrudan not vermek için hızlı sayısal giriş.',
+    levels: [],
+    fixedMaxScore: 100,
+  );
 
   static const numericFive = QuickScalePreset(
     id: 'numeric-5',
@@ -49,7 +65,7 @@ class QuickScalePreset {
     ],
   );
 
-  static const values = [numericFive, descriptiveFour, progressThree];
+  static const values = [numericHundred, numericFive, descriptiveFour, progressThree];
 
   static QuickScalePreset byId(String id) => values.firstWhere(
         (preset) => preset.id == id,
