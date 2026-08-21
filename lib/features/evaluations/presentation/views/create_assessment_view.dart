@@ -341,7 +341,7 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
               assessmentDate: date,
             );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      await Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => type == AssessmentType.quickScale
               ? QuickScaleGradingView(assessmentId: id)
