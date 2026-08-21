@@ -6,6 +6,8 @@ import 'package:olcerim/features/classrooms/presentation/controllers/classroom_p
 import 'package:olcerim/features/evaluations/domain/assessment_type.dart';
 import 'package:olcerim/features/evaluations/domain/quick_scale.dart';
 import 'package:olcerim/features/evaluations/presentation/controllers/evaluation_providers.dart';
+import 'package:olcerim/features/evaluations/presentation/views/grading_session_view.dart';
+import 'package:olcerim/features/evaluations/presentation/views/quick_scale_grading_view.dart';
 import 'package:olcerim/features/rubrics/presentation/controllers/rubric_providers.dart';
 import 'package:olcerim/features/rubrics/presentation/views/rubric_editor_view.dart';
 
@@ -78,7 +80,7 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
                 children: [
                   FilledButton(
                     onPressed: saving || !_canContinue ? null : details.onStepContinue,
-                    child: Text(step == 3 ? 'Değerlendirmeyi oluştur' : 'Devam'),
+                    child: Text(step == 3 ? 'Oluştur ve puanlamaya başla' : 'Devam'),
                   ),
                   if (step > 0) ...[
                     const SizedBox(width: 8),
@@ -123,7 +125,7 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
                     Text(
                       type == AssessmentType.rubric
                           ? 'Birden fazla kriteri ayrı ayrı puanlamak için Rubrik kullanın.'
-                          : 'Ders sırasında her öğrenciye tek dokunuşla tek bir genel düzey vermek için Hızlı Derecelendirme kullanın.',
+                          : 'Her öğrenciye tek bir genel puan veya düzey vermek için Hızlı Derecelendirme kullanın.',
                     ),
                   ],
                 ),
@@ -252,13 +254,16 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
                         children: [
                           Text(preset.description),
                           const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: preset.levels
-                                .map((level) => Chip(label: Text(level.label)))
-                                .toList(),
-                          ),
+                          if (preset.usesNumericInput)
+                            Chip(label: Text('0–${_scoreLabel(preset.maxScore)} puan'))
+                          else
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: preset.levels
+                                  .map((level) => Chip(label: Text(level.label)))
+                                  .toList(),
+                            ),
                         ],
                       ),
                     ),
@@ -301,6 +306,9 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
     return null;
   }
 
+  String _scoreLabel(double value) =>
+      value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
+
   Future<void> _pickDate() async {
     final selected = await showDatePicker(
       context: context,
@@ -332,7 +340,14 @@ class _CreateAssessmentViewState extends ConsumerState<CreateAssessmentView> {
               description: description.text,
               assessmentDate: date,
             );
-      if (mounted) Navigator.pop(context, id);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => type == AssessmentType.quickScale
+              ? QuickScaleGradingView(assessmentId: id)
+              : GradingSessionView(assessmentId: id),
+        ),
+      );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
