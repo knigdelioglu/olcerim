@@ -98,7 +98,11 @@ class _QuickScaleGradingViewState extends ConsumerState<QuickScaleGradingView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _QuickScaleHeader(detail: detail, levelCount: levels.length),
+        _QuickScaleHeader(
+          detail: detail,
+          levelCount: levels.length,
+          maxScore: criterion.maxScore,
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: SingleChildScrollView(
@@ -155,13 +159,22 @@ class _QuickScaleGradingViewState extends ConsumerState<QuickScaleGradingView> {
 }
 
 class _QuickScaleHeader extends StatelessWidget {
-  const _QuickScaleHeader({required this.detail, required this.levelCount});
+  const _QuickScaleHeader({
+    required this.detail,
+    required this.levelCount,
+    required this.maxScore,
+  });
+
   final AssessmentDetailRow detail;
   final int levelCount;
+  final double maxScore;
 
   @override
   Widget build(BuildContext context) {
     final description = detail.assessment.description?.trim();
+    final scaleLabel = levelCount == 0
+        ? '0–${_formatScore(maxScore)} puan'
+        : '$levelCount düzey';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Card(
@@ -175,9 +188,12 @@ class _QuickScaleHeader extends StatelessWidget {
                   const Icon(Icons.speed),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('Hızlı derecelendirme · ${detail.rubric.title}', style: Theme.of(context).textTheme.titleMedium),
+                    child: Text(
+                      'Hızlı derecelendirme · ${detail.rubric.title}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                  Chip(label: Text('$levelCount düzey')),
+                  Chip(label: Text(scaleLabel)),
                 ],
               ),
               const SizedBox(height: 6),
@@ -218,6 +234,13 @@ class _QuickScaleStudentCard extends ConsumerWidget {
       }
     }
     final currentEntry = entry;
+
+    Future<void> writeScore(double score) => ref.read(evaluationRepositoryProvider).score(
+          evaluationId: row.evaluation.id,
+          criterionId: criterion.id,
+          score: score,
+        );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -249,33 +272,39 @@ class _QuickScaleStudentCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: levels
-                  .map(
-                    (level) => ChoiceChip(
-                      selected: currentEntry?.score == level.score,
-                      label: Text(level.label),
-                      onSelected: (_) async {
-                        try {
-                          await ref.read(evaluationRepositoryProvider).score(
-                                evaluationId: row.evaluation.id,
-                                criterionId: criterion.id,
-                                score: level.score,
+            if (levels.isEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _NumericScoreField(
+                  currentScore: currentEntry?.score,
+                  maxScore: criterion.maxScore,
+                  onScore: writeScore,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: levels
+                    .map(
+                      (level) => ChoiceChip(
+                        selected: currentEntry?.score == level.score,
+                        label: Text(level.label),
+                        onSelected: (_) async {
+                          try {
+                            await writeScore(level.score);
+                          } catch (_) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Derecelendirme kaydedilemedi.')),
                               );
-                        } catch (_) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Derecelendirme kaydedilemedi.')),
-                            );
+                            }
                           }
-                        }
-                      },
-                    ),
-                  )
-                  .toList(),
-            ),
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
             if (currentEntry != null) ...[
               const SizedBox(height: 4),
               Align(
@@ -292,7 +321,11 @@ class _QuickScaleStudentCard extends ConsumerWidget {
                     currentEntry.note?.isNotEmpty == true ? Icons.sticky_note_2_outlined : Icons.note_add_outlined,
                     size: 18,
                   ),
-                  label: Text(currentEntry.note?.isNotEmpty == true ? 'Derecelendirme notunu düzenle' : 'Derecelendirme notu ekle'),
+                  label: Text(
+                    currentEntry.note?.isNotEmpty == true
+                        ? 'Derecelendirme notunu düzenle'
+                        : 'Derecelendirme notu ekle',
+                  ),
                 ),
               ),
               if (currentEntry.note?.isNotEmpty == true)
@@ -332,6 +365,115 @@ class _QuickScaleStudentCard extends ConsumerWidget {
   }
 }
 
+class _NumericScoreField extends StatefulWidget {
+  const _NumericScoreField({
+    required this.currentScore,
+    required this.maxScore,
+    required this.onScore,
+  });
+
+  final double? currentScore;
+  final double maxScore;
+  final Future<void> Function(double score) onScore;
+
+  @override
+  State<_NumericScoreField> createState() => _NumericScoreFieldState();
+}
+
+class _NumericScoreFieldState extends State<_NumericScoreField> {
+  late final TextEditingController controller;
+  late final FocusNode focusNode;
+  bool saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = TextEditingController(text: _formatNullableScore(widget.currentScore));
+    focusNode = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NumericScoreField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentScore != widget.currentScore && !focusNode.hasFocus) {
+      controller.text = _formatNullableScore(widget.currentScore);
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _save() async {
+    final normalized = controller.text.trim().replaceAll(',', '.');
+    final value = double.tryParse(normalized);
+    if (value == null || value < 0 || value > widget.maxScore) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('0 ile ${_formatScore(widget.maxScore)} arasında bir puan girin.'),
+        ),
+      );
+      return false;
+    }
+
+    setState(() => saving = true);
+    try {
+      await widget.onScore(value);
+      return true;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Puan kaydedilemedi. Tekrar deneyin.')),
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 220,
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                enabled: !saving,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: 'Puan',
+                  suffixText: '/ ${_formatScore(widget.maxScore)}',
+                ),
+                onSubmitted: (_) async {
+                  final saved = await _save();
+                  if (saved && mounted) FocusScope.of(context).nextFocus();
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: 'Puanı kaydet',
+              onPressed: saving ? null : _save,
+              icon: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check),
+            ),
+          ],
+        ),
+      );
+}
+
 class _QuickStatus extends StatelessWidget {
   const _QuickStatus({required this.status});
   final String status;
@@ -342,3 +484,8 @@ class _QuickStatus extends StatelessWidget {
         semanticLabel: status == EvaluationStatus.completed.storageValue ? 'Tamamlandı' : 'Değerlendirilmedi',
       );
 }
+
+String _formatNullableScore(double? value) => value == null ? '' : _formatScore(value);
+
+String _formatScore(double value) =>
+    value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
