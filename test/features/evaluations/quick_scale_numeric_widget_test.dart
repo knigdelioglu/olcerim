@@ -75,17 +75,19 @@ void main() {
 
     expect(find.text('0–100 puan'), findsOneWidget);
     expect(find.byType(TextField), findsNWidgets(2));
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).textInputAction,
+      TextInputAction.next,
+    );
 
     await tester.enterText(find.byType(TextField).first, '87');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.tap(find.byTooltip('Puanı kaydet').first);
     await tester.pump();
 
-    // The successful submit intentionally moves focus to the next TextField.
-    // Do not use pumpAndSettle here: EditableText's blinking cursor can keep
-    // scheduling frames and turn a fast regression into a long timeout.
     final firstEntries = await db.evaluationDao
         .watchEntries(data.firstEvaluationId)
-        .firstWhere((items) => items.isNotEmpty);
+        .firstWhere((items) => items.isNotEmpty)
+        .timeout(const Duration(seconds: 5));
     await tester.pump();
     expect(firstEntries.single.score, 87);
     final firstRow = (await db.evaluationDao.watchStudentsForAssessment(data.assessmentId).first)
@@ -93,7 +95,7 @@ void main() {
     expect(firstRow.evaluation.status, 'completed');
 
     await tester.enterText(find.byType(TextField).at(1), '101');
-    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.tap(find.byTooltip('Puanı kaydet').at(1));
     await tester.pump();
 
     expect(find.text('0 ile 100 arasında bir puan girin.'), findsOneWidget);
