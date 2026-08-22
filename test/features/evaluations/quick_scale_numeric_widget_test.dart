@@ -78,9 +78,15 @@ void main() {
 
     await tester.enterText(find.byType(TextField).first, '87');
     await tester.testTextInput.receiveAction(TextInputAction.next);
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    final firstEntries = await db.evaluationDao.watchEntries(data.firstEvaluationId).first;
+    // The successful submit intentionally moves focus to the next TextField.
+    // Do not use pumpAndSettle here: EditableText's blinking cursor can keep
+    // scheduling frames and turn a fast regression into a long timeout.
+    final firstEntries = await db.evaluationDao
+        .watchEntries(data.firstEvaluationId)
+        .firstWhere((items) => items.isNotEmpty);
+    await tester.pump();
     expect(firstEntries.single.score, 87);
     final firstRow = (await db.evaluationDao.watchStudentsForAssessment(data.assessmentId).first)
         .firstWhere((row) => row.evaluation.id == data.firstEvaluationId);
